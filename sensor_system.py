@@ -26,7 +26,8 @@ class MS_ABC(ABC):
                                  baudrate=115200,
                                  bytesize=serial.EIGHTBITS,
                                  parity=serial.PARITY_NONE,
-                                 stopbits=serial.STOPBITS_ONE)
+                                 stopbits=serial.STOPBITS_ONE,
+                                 timeout=1)
 
         self.sensors_number = None  # Must be implemented by child
         self.struct = None  # Must be implemented by child
@@ -107,6 +108,8 @@ class MS_ABC(ABC):
             begin_key_index + self.sensors_number * data_one_sensor_length + end_key)
         if recieved[-end_key:] != self.END_KEY:
             print(recieved)
+            while self.ser.read(1):
+                pass
             raise MS_ABC.MSException("END_KEY is not matching")
         if recieved[:begin_key_index] != self.BEGIN_KEY:
             print(recieved)
@@ -134,7 +137,7 @@ class MS_ABC(ABC):
         result = 0
         for idx, value in enumerate(values):
             result |= (sensor_mask[value] << (idx * 2))
-        self.ser.write(result.to_bytes(self.sensors_number / 4,
+        self.ser.write(result.to_bytes(int(self.sensors_number / 4),
                                        "little", signed=False))
         self.ser.write(self.END_KEY)
 

@@ -1,14 +1,35 @@
 import tkinter as tk
 from tkinter import ttk
+
 import numpy as np
 from scipy.optimize import curve_fit
-from sensor_system import MS12
+
+from sensor_system import MS12, MS4
+
+
+class MS_Uni():
+    def __init__(self, sensor_number, port):
+        self.sensors_number = sensor_number
+        if sensor_number == 4:
+            self.ms = MS4(port)
+        elif sensor_number == 12:
+            self.ms = MS12(port)
+        else:
+            raise Exception("Wrong port number")
+
+    def send_measurement_range(self, values):
+        self.ms.send_measurement_range(values[:self.sensors_number])
+        self.ms.recieve_measurement_range_answer()
+
+    def full_request(self, values):
+        return self.ms.full_request(values[:self.sensors_number], self.ms.REQUEST_U)[0]
+
 
 rs = np.array([5e8, 1e8, 1e7, 1e6, 5.1e4])
 r4_str_values = ["100 kOhm", "1.1 MOhm", "11.1 MOhm"]
 
 r4_combobox_dict = dict(zip(r4_str_values, (1e5, 1.1e6, 1.11e7)))
-r4_range_dict = dict(zip(r4_str_values, (1,2,3)))
+r4_range_dict = dict(zip(r4_str_values, (1, 2, 3)))
 
 window = tk.Tk()
 window.title("Sensor calibrator")
@@ -48,13 +69,15 @@ entries = dict(
 
 
 def get_func(index):
-
     def measure_u():
-
-        ms = MS12(port=com_port_variable.get())
-        ms.send_measurement_range((r4_range_dict[r4_variable.get()], )*ms.sensors_number)
-        answer = ms.full_request((0, )*ms.sensors_number, ms.REQUEST_U)
-        u_variables[index].set(answer[sensor_variable.get()])
+        print(f"{com_port_variable.get()}, {r4_variable.get()}, {sensor_variable.get()}")
+        ms = MS_Uni(sensor_number=4, port=com_port_variable.get())
+        ms.send_measurement_range((r4_range_dict[r4_variable.get()],) * 12)
+        answer = ms.full_request((0,) * 12)
+        try:
+            u_variables[index].set(answer[sensor_variable.get()-1])
+        except IndexError:
+            print("No sensor there")
 
     return measure_u
 
