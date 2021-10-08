@@ -1,2 +1,4 @@
 .idea/
 __pycache__/
+venv/
+.ycm_extra_conf.py

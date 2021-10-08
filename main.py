@@ -1,13 +1,13 @@
-import tkinter as tk
-from tkinter import ttk
-
 import numpy as np
 from scipy.optimize import curve_fit
 from serial.tools.list_ports import comports
 
 from sensor_system import MS12, MS4
 
-rs = np.array([5e8, 1e8, 1e7, 1e6, 5.1e4])
+from PySide2 import QtWidgets, QtCore
+from pyqtgraph import PlotWidget
+
+rs = np.array([5e8, 1e8, 1e7, 1e6, 1e5, 5.1e4])
 r4_str_values = ["100 kOhm", "1.1 MOhm", "11.1 MOhm"]
 r4_combobox_dict = dict(zip(r4_str_values, (1e5, 1.1e6, 1.11e7)))
 r4_range_dict = dict(zip(r4_str_values, (1, 2, 3)))
