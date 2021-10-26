@@ -7,7 +7,7 @@ from serial.tools.list_ports import comports
 
 from sensor_system import MS12, MS4
 
-rs = np.array([5e8, 1e8, 1e7, 1e6, 1e5, 5.1e4])
+rs = np.array([5e8, 1e8, 1e7, 1e6, 1e5, 5.1e4, 1e4, 1e3])
 r4_str_values = ["100 kOhm", "1.1 MOhm", "11.1 MOhm"]
 r4_combobox_dict = dict(zip(r4_str_values, (1e5, 1.1e6, 1.11e7)))
 r4_range_dict = dict(zip(r4_str_values, (1, 2, 3)))
@@ -85,8 +85,20 @@ class OneSensorFrame(tk.Frame):
         for idx, (label, entry, button) in enumerate(zip(r_labels, entries.values(), buttons.values())):
             label.grid(column=0, row=idx + 3)
             entry.grid(column=1, row=idx + 3)
-            button.grid(column=3, row=idx + 3)
-
+            button.grid(column=2, row=idx + 3)
+            
+        start_array_variable = tk.IntVar(master=self)
+        start_array_entry = tk.Entry(master=self,
+                                   textvariable=start_array_variable, width=10)
+        start_array_entry.grid(column=1, row=len(rs)+3)
+        start_array_variable.set(0)
+        
+        end_array_variable = tk.IntVar(master=self)
+        end_array_entry = tk.Entry(master=self,
+                                   textvariable=end_array_variable, width=10)
+        end_array_entry.grid(column=2, row=len(rs)+3)
+        end_array_variable.set(len(rs))
+        
         results_var = tk.StringVar(master=self)
 
         def click_calc_button():
@@ -95,17 +107,20 @@ class OneSensorFrame(tk.Frame):
             def f(u, rs1, rs2):
                 r4 = r4_combobox_dict[r4_variable.get()]
                 return (rs1 - rs2) * r4 / ((2.5 + 2.5 * k - u) / k - rs2) - r4
+                
+            start_array_idx = start_array_variable.get()
+            end_array_idx = end_array_variable.get()
 
-            x = tuple(u_variables[i].get() for i in range(len(r_labels_str)))
-            y = rs
+            x = tuple(u_variables[i].get() for i in range(len(r_labels_str)))[start_array_idx:end_array_idx]
+            y = rs[start_array_idx:end_array_idx]
             popt, _ = curve_fit(f, x, y, p0=(3.004, 1.991))
             results_var.set(str(popt))
 
         calc_button = tk.Button(master=self, command=click_calc_button, text="Calc Coeffs")
-        calc_button.grid(column=0, row=9)
+        calc_button.grid(column=0, row=len(rs)+4)
 
         results_label = tk.Label(master=self, textvariable=results_var)
-        results_label.grid(column=1, row=9, columnspan=2)
+        results_label.grid(column=1, row=len(rs)+4, columnspan=2)
 
 
 class Variable:
@@ -166,6 +181,8 @@ frame_1.grid(column=2, row=0)
 frame_2 = OneSensorFrame(window, settings)
 frame_2.grid(column=3, row=0)
 frame_3 = OneSensorFrame(window, settings)
-frame_3.grid(column=4, row=0)
+frame_3.grid(column=2, row=1)
+frame_4 = OneSensorFrame(window, settings)
+frame_4.grid(column=3, row=1)
 
 window.mainloop()
