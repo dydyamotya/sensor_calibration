@@ -1,19 +1,31 @@
 import numpy as np
 from scipy.optimize import curve_fit
 from serial.tools.list_ports import comports
+import sys
 
 from sensor_system import MS12, MS4
 
-from PySide2 import QtWidgets, QtCore
-from pyqtgraph import PlotWidget
+from PySide2 import QtWidgets, QtCore, QtGui
+from pyside_constructor_widgets.widgets import ComPortWidget
+import logging
+import matplotlib as mpl
+from matplotlib import figure
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 
-rs = np.array([5e8, 1e8, 1e7, 1e6, 1e5, 5.1e4])
+logger = logging.getLogger(__name__)
+
+rs = np.array([5e8, 1e8, 1e7, 1e6, 1e5, 5.1e4, 1e4, 1e3])
 r4_str_values = ["100 kOhm", "1.1 MOhm", "11.1 MOhm"]
 r4_combobox_dict = dict(zip(r4_str_values, (1e5, 1.1e6, 1.11e7)))
 r4_range_dict = dict(zip(r4_str_values, (1, 2, 3)))
 
 r_labels_str = tuple(map("{:1.2e}".format, rs))
 
+def get_float(x):
+    try:
+        return float(x)
+    except:
+        return 0
 
 class MS_Uni():
     def __init__(self, sensor_number, port):
@@ -32,138 +44,202 @@ class MS_Uni():
     def full_request(self, values):
         return self.ms.full_request(values[:self.sensors_number], self.ms.REQUEST_U)[0]
 
+class MainWidget(QtWidgets.QWidget):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._init_ui()
 
-class OneSensorFrame(tk.Frame):
-    def __init__(self, master, setting, *args, **kwargs):
-        super(OneSensorFrame, self).__init__(master=master, *args, **kwargs)
+    def _init_ui(self):
+        layout = QtWidgets.QVBoxLayout()
+        self.setLayout(layout)
+
+        self.settings_widget = EquipmentSettings()
+        layout.addWidget(self.settings_widget)
+        hbox_layout = QtWidgets.QHBoxLayout()
+        layout.addLayout(hbox_layout)
+        for _ in range(4):
+            hbox_layout.addWidget(OneSensorFrame(self, self.settings_widget))
+
+
+
+class PlusWidget(QtWidgets.QWidget):
+    def __init__(self):
+        super().__init__()
+        self.label = QtWidgets.QPushButton(icon=QtGui.QIcon("icons/plus.png"))
+        self.label.setMinimumSize(20, 20)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        layout = QtWidgets.QVBoxLayout()
+        layout.addWidget(self.label)
+        layout.setAlignment(self.label, QtCore.Qt.AlignCenter)
+        self.setLayout(layout)
+
+
+class OneSensorFrame(QtWidgets.QWidget):
+    def __init__(self, master, settings, *args, **kwargs):
+        super(OneSensorFrame, self).__init__(master, *args, **kwargs)
         self.settings = settings
-        com_port_variable, sensor_number_variable = self.settings.get_variables()
+        self.labels = []
 
-        r4_label = tk.Label(master=self, text="Сопротивление сравнения:")
-        r4_variable = tk.StringVar(master=self)
-        r4_label.grid(column=0, row=0)
-        r4_combobox = ttk.Combobox(master=self,
-                                   values=tuple(r4_combobox_dict.keys()),
-                                   state="readonly",
-                                   textvariable=r4_variable)
-        r4_combobox.set(tuple(r4_combobox_dict.keys())[0])
-        r4_combobox.grid(column=1, row=0)
+        layout = QtWidgets.QGridLayout()
+        layout.setColumnStretch(0, 0)
+        layout.setColumnStretch(1, 1)
+        layout.setColumnStretch(2, 0)
+        self.setLayout(layout)
 
-        sensor_label = tk.Label(master=self, text="Номер сенсора")
-        sensor_label.grid(column=0, row=1)
-        sensor_values = tuple(range(1, 13))
-        sensor_variable = tk.IntVar(master=self)
-        sensor_combobox = ttk.Combobox(master=self,
-                                       values=sensor_values,
-                                       state="readonly",
-                                       textvariable=sensor_variable)
-        sensor_combobox.set(1)
-        sensor_combobox.grid(column=1, row=1)
+        row = 0
 
-        r_labels = tuple(tk.Label(master=self, text=label) for label in r_labels_str)
-        u_variables = tuple(tk.DoubleVar(master=self, value=0) for i in range(len(r_labels_str)))
+        r4_widget = QtWidgets.QComboBox()
+        r4_widget.addItems(tuple(r4_combobox_dict.keys()))
+        r4_widget.setEditable(False)
+        layout.addWidget(r4_widget, row, 1)
+        layout.addWidget(QtWidgets.QLabel("R4: "), row, 0)
+        row += 1
+
+        sensor_widget = QtWidgets.QComboBox()
+        sensor_widget.addItems(tuple(map(str, range(1, 13))))
+        sensor_widget.setEditable(False)
+        layout.addWidget(sensor_widget, row, 1)
+        layout.addWidget(QtWidgets.QLabel("Sensor #: "), row, 0)
+        row += 1
+        
+
         entries = dict(
-            zip(r_labels_str, (tk.Entry(master=self, textvariable=u_variables[i]) for i in range(len(r_labels_str)))))
+            zip(r_labels_str, (QtWidgets.QLineEdit(self) for i in range(len(r_labels_str)))))
 
         def get_func(index):
             def measure_u():
-                print(f"{com_port_variable.get()}, {r4_variable.get()}, {sensor_variable.get()}")
-                ms = MS_Uni(sensor_number=sensor_number_variable.get(), port=com_port_variable.get())
-                ms.send_measurement_range((r4_range_dict[r4_variable.get()],) * 12)
-                answer = ms.full_request((0,) * 12)
+                com_port, sensor_number = self.settings.get_variables()
+                print(f"{com_port}, {r4_widget.currentText()}, {sensor_widget.currentText()}")
+                ms = MS_Uni(sensor_number=sensor_number, port=com_port)
+                ms.send_measurement_range((r4_range_dict[r4_widget.currentText()],) * 12)
+
+                answers = [ms.full_request((0,) * 12) for _ in range(5)]
                 try:
-                    u_variables[index].set(answer[sensor_variable.get() - 1])
+                    entries[index].setText("{:2.5f}".format(sum([answer[int(sensor_widget.currentText()) - 1] for answer in answers])/5))
                 except IndexError:
                     print("No sensor there")
 
             return measure_u
 
         buttons = dict(zip(r_labels_str,
-                           (tk.Button(master=self, text="Получить U", command=get_func(i)) for i in
+                           (QtWidgets.QPushButton(icon=QtGui.QIcon("icons/load.png")) for i in
                             range(len(r_labels_str)))))
 
-        for idx, (label, entry, button) in enumerate(zip(r_labels, entries.values(), buttons.values())):
-            label.grid(column=0, row=idx + 3)
-            entry.grid(column=1, row=idx + 3)
-            button.grid(column=3, row=idx + 3)
+        for idx, (label, entry, button) in enumerate(zip(r_labels_str, entries.values(), buttons.values())):
+            button.clicked.connect(get_func(idx))
+            button.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+            label_widget = QtWidgets.QLabel(label)
+            self.labels.append(label_widget)
+            layout.addWidget(label_widget, row, 0)
+            layout.addWidget(entry, row, 1)
+            layout.addWidget(button, row, 2)
+            row += 1
 
-        results_var = tk.StringVar(master=self)
+
+        result_widget_1 = QtWidgets.QLineEdit()
+        result_widget_2 = QtWidgets.QLineEdit()
+        result_widget_1.setReadOnly(True)
+        result_widget_2.setReadOnly(True)
+
+        slice_widget_1 = QtWidgets.QLineEdit(text="0")
+        slice_widget_1.setValidator(QtGui.QIntValidator(0, 8))
+        slice_widget_2 = QtWidgets.QLineEdit(text="8")
+        slice_widget_2.setValidator(QtGui.QIntValidator(0, 8))
+
+        rs1_widget = QtWidgets.QLineEdit(text="3.004")
+        rs1_widget.setValidator(QtGui.QDoubleValidator())
+        rs2_widget = QtWidgets.QLineEdit(text="1.991")
+        rs2_widget.setValidator(QtGui.QDoubleValidator())
 
         def click_calc_button():
             k = 4.068
 
             def f(u, rs1, rs2):
-                r4 = r4_combobox_dict[r4_variable.get()]
+                r4 = r4_combobox_dict[r4_widget.currentText()]
                 return (rs1 - rs2) * r4 / ((2.5 + 2.5 * k - u) / k - rs2) - r4
+            
+            try:
+                left_slice = int(slice_widget_1.text())
+                right_slice = int(slice_widget_2.text())
+                rs1 = float(rs1_widget.text())
+                rs2 = float(rs2_widget.text())
+            except ValueError:
+                logger.error("You should enter some values in these fields")
+                return None
+            else:
+                x = tuple(entries[i].text() for i in r_labels_str)
+                x = tuple(map(get_float, x))
+                y = rs
+                x, y = x[left_slice:right_slice], y[left_slice:right_slice]
+                popt, _ = curve_fit(f, x, y, p0=(rs1, rs2))
+                result_widget_1.setText("{:2.6f}".format(popt[0]))
+                result_widget_2.setText("{:2.6f}".format(popt[1]))
 
-            x = tuple(u_variables[i].get() for i in range(len(r_labels_str)))
-            y = rs
-            popt, _ = curve_fit(f, x, y, p0=(3.004, 1.991))
-            results_var.set(str(popt))
+                PlotWidget(self, x, y, f, popt)
 
-        calc_button = tk.Button(master=self, command=click_calc_button, text="Calc Coeffs")
-        calc_button.grid(column=0, row=8)
+        calc_button = QtWidgets.QPushButton(text="Calc coeffs")
+        calc_button.clicked.connect(click_calc_button)
 
-        results_label = tk.Label(master=self, textvariable=results_var)
-        results_label.grid(column=1, row=8, columnspan=2)
+        layout.addWidget(slice_widget_1, row, 0)
+        layout.addWidget(slice_widget_2, row, 1)
+        row+=1
 
+        layout.addWidget(rs1_widget, row, 0)
+        layout.addWidget(rs2_widget, row, 1)
+        row += 1
 
-class Variable:
-    def __init__(self, master, text, row, var_type, values):
-        label = tk.Label(master=master, text=text)
-        label.grid(column=0, row=row)
-        self.variable = var_type(master=master)
-        combobox = ttk.Combobox(master=master,
-                                values=values,
-                                textvariable=self.variable)
-        combobox.grid(column=1, row=row)
-        try:
-            self.variable.set(values[0])
-        except IndexError:
-            pass
-
-
-    def get(self):
-        return self.variable.get()
-
-
-class CopyableEntries(tk.Frame):
-    def __init__(self, *args, master=None, columns=1, rows=1, **kwargs):
-        super(CopyableEntries, self).__init__(master, *args, **kwargs)
-
-        self.columns = tuple(range(columns))
-        self.rows = tuple(range(rows))
-        self.entries = dict(
-            zip(self.rows, (dict(zip(self.columns, ((None, None),) * len(self.columns))),) * len(self.rows)))
-        for column in self.columns:
-            for row in self.rows:
-                variable = tk.StringVar(self)
-                entry = tk.Entry(self, textvariable=variable)
-                entry.grid(column=column, row=row)
-                self.entries[row][column] = (entry, variable)
+        layout.addWidget(calc_button, row, 0)
+        layout.addWidget(result_widget_1, row, 1)
+        row += 1
+        layout.addWidget(result_widget_2, row, 1)
 
 
-class EquipmentSettings:
-    def __init__(self, master_of_widgets):
-        avaliable_comports = tuple(map(lambda x: x.device, comports()))
-        self.intra_frame = tk.Frame(master_of_widgets)
-
-        self.com_port = Variable(self.intra_frame, "COM Port:", 0, tk.StringVar, avaliable_comports)
-        self.sensor_number = Variable(self.intra_frame, "Sensor number:", 1, tk.IntVar, (4, 12))
-        self.intra_frame.grid(column=0, row=0)
+class EquipmentSettings(QtWidgets.QWidget):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, *kwargs)
+        layout = QtWidgets.QVBoxLayout()
+        self.setLayout(layout)
+        self.comport_widget = ComPortWidget()
+        layout.addWidget(self.comport_widget)
+        self.sensor_number_widget = QtWidgets.QComboBox()
+        layout.addWidget(self.sensor_number_widget)
+        self.sensor_number_widget.addItems(("4", "12"))
+        self.sensor_number_widget.setCurrentText("4")
 
     def get_variables(self):
-        return self.com_port, self.sensor_number
+        return self.comport_widget.text(), self.sensor_number_widget.currentText()
 
+class PlotWidget(QtWidgets.QWidget):
+    def __init__(self, parent, x, y, f, popt):
+        super().__init__(parent, f=QtCore.Qt.Tool)
+        fig = figure.Figure()
+        ax = fig.add_subplot(1, 1, 1)
+        canvas = FigureCanvasQTAgg(figure=fig)
+        layout=QtWidgets.QVBoxLayout()
+        self.setLayout(layout)
+        layout.addWidget(canvas)
+        toolbox = NavigationToolbar2QT(canvas, self)
+        layout.addWidget(toolbox)
+        ax.set_yscale("log")
+        ax.set_xlabel("Voltage, V")
+        ax.set_ylabel("log(R)")
+        self.setWindowTitle("Visualization of regression")
+        ax.scatter(x, y)
+        linspace = np.linspace(0, 5)
+        ax.plot(linspace, f(linspace, *popt))
+        canvas.draw()
+        self.show()
 
-window = tk.Tk()
-window.title("Sensor calibrator")
+def main():
+    app = QtWidgets.QApplication()
 
-settings = EquipmentSettings(window)
+    logging.basicConfig(level=logging.DEBUG)
 
-frame_1 = OneSensorFrame(window, settings)
-frame_1.grid(column=2, row=0)
-frame_2 = OneSensorFrame(window, settings)
-frame_2.grid(column=3, row=0)
+    window = MainWidget()
+    window.setWindowTitle("Sensor calibrator")
+    window.show()
 
-window.mainloop()
+    sys.exit(app.exec_())
+
+if __name__ == "__main__":
+    main()
