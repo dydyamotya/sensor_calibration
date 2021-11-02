@@ -109,13 +109,13 @@ class OneSensorFrame(QtWidgets.QWidget):
         def get_func(index):
             def measure_u():
                 com_port, sensor_number = self.settings.get_variables()
-                print(f"{com_port}, {r4_widget.currentText()}, {sensor_widget.currentText()}")
+                logger.debug(f"{com_port}, {r4_widget.currentText()}, {sensor_widget.currentText()}")
                 ms = MS_Uni(sensor_number=sensor_number, port=com_port)
                 ms.send_measurement_range((r4_range_dict[r4_widget.currentText()],) * 12)
 
                 answers = [ms.full_request((0,) * 12) for _ in range(5)]
                 try:
-                    entries[index].setText("{:2.5f}".format(sum([answer[int(sensor_widget.currentText()) - 1] for answer in answers])/5))
+                    entries[r_labels_str[index]].setText("{:2.5f}".format(sum([answer[int(sensor_widget.currentText()) - 1] for answer in answers])/5))
                 except IndexError:
                     print("No sensor there")
 
@@ -207,7 +207,7 @@ class EquipmentSettings(QtWidgets.QWidget):
         self.sensor_number_widget.setCurrentText("4")
 
     def get_variables(self):
-        return self.comport_widget.text(), self.sensor_number_widget.currentText()
+        return self.comport_widget.text(), int(self.sensor_number_widget.currentText())
 
 class PlotWidget(QtWidgets.QWidget):
     def __init__(self, parent, x, y, f, popt):
