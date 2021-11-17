@@ -11,7 +11,7 @@ import logging
 import matplotlib as mpl
 from matplotlib import figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
-
+import argparse
 logger = logging.getLogger(__name__)
 
 rs = np.array([5e8, 1e8, 1e7, 1e6, 1e5, 5.1e4, 1e4, 1e3])
@@ -21,11 +21,13 @@ r4_range_dict = dict(zip(r4_str_values, (1, 2, 3)))
 
 r_labels_str = tuple(map("{:1.2e}".format, rs))
 
+
 def get_float(x):
     try:
         return float(x)
     except:
         return 0
+
 
 class MS_Uni():
     def __init__(self, sensor_number, port):
@@ -44,6 +46,7 @@ class MS_Uni():
     def full_request(self, values):
         return self.ms.full_request(values[:self.sensors_number], self.ms.REQUEST_U)[0]
 
+
 class MainWidget(QtWidgets.QWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -61,13 +64,13 @@ class MainWidget(QtWidgets.QWidget):
             hbox_layout.addWidget(OneSensorFrame(self, self.settings_widget))
 
 
-
 class PlusWidget(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
         self.label = QtWidgets.QPushButton(icon=QtGui.QIcon("icons/plus.png"))
         self.label.setMinimumSize(20, 20)
-        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                           QtWidgets.QSizePolicy.Expanding)
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.label)
         layout.setAlignment(self.label, QtCore.Qt.AlignCenter)
@@ -101,7 +104,6 @@ class OneSensorFrame(QtWidgets.QWidget):
         layout.addWidget(sensor_widget, row, 1)
         layout.addWidget(QtWidgets.QLabel("Sensor #: "), row, 0)
         row += 1
-        
 
         entries = dict(
             zip(r_labels_str, (QtWidgets.QLineEdit(self) for i in range(len(r_labels_str)))))
@@ -109,13 +111,16 @@ class OneSensorFrame(QtWidgets.QWidget):
         def get_func(index):
             def measure_u():
                 com_port, sensor_number = self.settings.get_variables()
-                logger.debug(f"{com_port}, {r4_widget.currentText()}, {sensor_widget.currentText()}")
+                logger.debug(
+                    f"{com_port}, {r4_widget.currentText()}, {sensor_widget.currentText()}")
                 ms = MS_Uni(sensor_number=sensor_number, port=com_port)
-                ms.send_measurement_range((r4_range_dict[r4_widget.currentText()],) * 12)
+                ms.send_measurement_range(
+                    (r4_range_dict[r4_widget.currentText()],) * 12)
 
                 answers = [ms.full_request((0,) * 12) for _ in range(15)]
                 try:
-                    entries[r_labels_str[index]].setText("{:2.5f}".format(sum([answer[int(sensor_widget.currentText()) - 1] for answer in answers[5:]])/10))
+                    entries[r_labels_str[index]].setText("{:2.5f}".format(
+                        sum([answer[int(sensor_widget.currentText()) - 1] for answer in answers[5:]])/10))
                 except IndexError:
                     print("No sensor there")
 
@@ -127,14 +132,14 @@ class OneSensorFrame(QtWidgets.QWidget):
 
         for idx, (label, entry, button) in enumerate(zip(r_labels_str, entries.values(), buttons.values())):
             button.clicked.connect(get_func(idx))
-            button.setSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
+            button.setSizePolicy(QtWidgets.QSizePolicy.Minimum,
+                                 QtWidgets.QSizePolicy.Expanding)
             label_widget = QtWidgets.QLabel(label)
             self.labels.append(label_widget)
             layout.addWidget(label_widget, row, 0)
             layout.addWidget(entry, row, 1)
             layout.addWidget(button, row, 2)
             row += 1
-
 
         result_widget_1 = QtWidgets.QLineEdit()
         result_widget_2 = QtWidgets.QLineEdit()
@@ -157,7 +162,7 @@ class OneSensorFrame(QtWidgets.QWidget):
 
             def f(u, rs1, rs2):
                 return (rs1 - rs2) * r4 / ((2.5 + 2.5 * k - u) / k - rs2) - r4
-            
+
             try:
                 left_slice = int(slice_widget_1.text())
                 right_slice = int(slice_widget_2.text())
@@ -182,7 +187,7 @@ class OneSensorFrame(QtWidgets.QWidget):
 
         layout.addWidget(slice_widget_1, row, 0)
         layout.addWidget(slice_widget_2, row, 1)
-        row+=1
+        row += 1
 
         layout.addWidget(rs1_widget, row, 0)
         layout.addWidget(rs2_widget, row, 1)
@@ -209,13 +214,14 @@ class EquipmentSettings(QtWidgets.QWidget):
     def get_variables(self):
         return self.comport_widget.text(), int(self.sensor_number_widget.currentText())
 
+
 class PlotWidget(QtWidgets.QWidget):
     def __init__(self, parent, x, y, f, popt):
         super().__init__(parent, f=QtCore.Qt.Tool)
         fig = figure.Figure()
         ax = fig.add_subplot(1, 1, 1)
         canvas = FigureCanvasQTAgg(figure=fig)
-        layout=QtWidgets.QVBoxLayout()
+        layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
         layout.addWidget(canvas)
         toolbox = NavigationToolbar2QT(canvas, self)
@@ -230,16 +236,27 @@ class PlotWidget(QtWidgets.QWidget):
         canvas.draw()
         self.show()
 
+    def keyReleaseEvent(self, event):
+        if event.key() == QtCore.Qt.Key_Escape:
+            self.close()
+
+
 def main():
     app = QtWidgets.QApplication()
 
-    logging.basicConfig(level=logging.DEBUG)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--debug", action="store_true")
+
+    args = parser.parse_args()
+
+    logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
 
     window = MainWidget()
     window.setWindowTitle("Sensor calibrator")
     window.show()
 
     sys.exit(app.exec_())
+
 
 if __name__ == "__main__":
     main()
