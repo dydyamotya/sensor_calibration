@@ -113,9 +113,9 @@ class OneSensorFrame(QtWidgets.QWidget):
                 ms = MS_Uni(sensor_number=sensor_number, port=com_port)
                 ms.send_measurement_range((r4_range_dict[r4_widget.currentText()],) * 12)
 
-                answers = [ms.full_request((0,) * 12) for _ in range(5)]
+                answers = [ms.full_request((0,) * 12) for _ in range(15)]
                 try:
-                    entries[r_labels_str[index]].setText("{:2.5f}".format(sum([answer[int(sensor_widget.currentText()) - 1] for answer in answers])/5))
+                    entries[r_labels_str[index]].setText("{:2.5f}".format(sum([answer[int(sensor_widget.currentText()) - 1] for answer in answers[5:]])/10))
                 except IndexError:
                     print("No sensor there")
 
@@ -153,9 +153,9 @@ class OneSensorFrame(QtWidgets.QWidget):
 
         def click_calc_button():
             k = 4.068
+            r4 = r4_combobox_dict[r4_widget.currentText()]
 
             def f(u, rs1, rs2):
-                r4 = r4_combobox_dict[r4_widget.currentText()]
                 return (rs1 - rs2) * r4 / ((2.5 + 2.5 * k - u) / k - rs2) - r4
             
             try:

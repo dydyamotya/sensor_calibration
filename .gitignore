@@ -2,3 +2,5 @@
 __pycache__/
 venv/
 .ycm_extra_conf.py
+icons/Thumbs*
+output/
