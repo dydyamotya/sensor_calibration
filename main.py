@@ -110,7 +110,7 @@ class OneSensorFrame(QtWidgets.QWidget):
 
         def get_func(index):
             def measure_u():
-                com_port, sensor_number = self.settings.get_variables()
+                com_port, sensor_number, _ = self.settings.get_variables()
                 logger.debug(
                     f"{com_port}, {r4_widget.currentText()}, {sensor_widget.currentText()}")
                 ms = MS_Uni(sensor_number=sensor_number, port=com_port)
@@ -182,8 +182,9 @@ class OneSensorFrame(QtWidgets.QWidget):
                 x, y = x[left_slice:right_slice], y[left_slice:right_slice]
                 #popt, _ = curve_fit(f, x, y, p0=(rs1, rs2), bounds = ((2.9, 1.8), (3.2, 2.1)), method="dogbox")
                 popt, _ = curve_fit(f_logd, x, np.log10(y), p0=(rs1, rs2))
-                result_widget_1.setText("{:2.6f}".format(popt[0]))
-                result_widget_2.setText("{:2.6f}".format(popt[1]))
+                *_, separator = self.settings.get_variables()
+                result_widget_1.setText("{:2.6f}".format(popt[0]).replace(".", "," if separator else "."))
+                result_widget_2.setText("{:2.6f}".format(popt[1]).replace(".", "," if separator else "."))
 
                 PlotWidget(self, x, y, f, popt)
 
@@ -220,15 +221,21 @@ class EquipmentSettings(QtWidgets.QWidget):
         super().__init__(*args, *kwargs)
         layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
+
         self.comport_widget = ComPortWidget()
         layout.addWidget(self.comport_widget)
+
         self.sensor_number_widget = QtWidgets.QComboBox()
         layout.addWidget(self.sensor_number_widget)
+
+        self.separator_checkbox = QtWidgets.QCheckBox()
+        layout.addWidget(self.separator_checkbox)
+
         self.sensor_number_widget.addItems(("4", "12"))
         self.sensor_number_widget.setCurrentText("12")
 
     def get_variables(self):
-        return self.comport_widget.text(), int(self.sensor_number_widget.currentText())
+        return self.comport_widget.text(), int(self.sensor_number_widget.currentText()), self.separator_checkbox.isChecked()
 
 
 class PlotWidget(QtWidgets.QWidget):
