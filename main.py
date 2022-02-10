@@ -14,12 +14,29 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationTool
 import argparse
 logger = logging.getLogger(__name__)
 
+from collections import UserDict
+
+class ResistanseDict(UserDict):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def __getitem__(self, key):
+        if key in self.data:
+            return self.data[key]
+        else:
+            try:
+                return float(key)
+            except ValueError:
+                raise
+
+
 rs = np.array([5e8, 1e8, 1e7, 1e6, 1e5, 5.1e4, 1e4, 1e3])
 r4_str_values = ["100 kOhm", "1.1 MOhm", "11.1 MOhm"]
-r4_combobox_dict = dict(zip(r4_str_values, (1e5, 1.1e6, 1.11e7)))
+r4_combobox_dict = ResistanseDict(zip(r4_str_values, (1e5, 1.1e6, 1.11e7)))
 r4_range_dict = dict(zip(r4_str_values, (1, 2, 3)))
 
 r_labels_str = tuple(map("{:1.2e}".format, rs))
+
 
 
 def get_float(x):
@@ -93,7 +110,7 @@ class OneSensorFrame(QtWidgets.QWidget):
 
         r4_widget = QtWidgets.QComboBox()
         r4_widget.addItems(tuple(r4_combobox_dict.keys()))
-        r4_widget.setEditable(False)
+        r4_widget.setEditable(True)
         layout.addWidget(r4_widget, row, 1)
         layout.addWidget(QtWidgets.QLabel("R4: "), row, 0)
         row += 1
@@ -114,15 +131,19 @@ class OneSensorFrame(QtWidgets.QWidget):
                 logger.debug(
                     f"{com_port}, {r4_widget.currentText()}, {sensor_widget.currentText()}")
                 ms = MS_Uni(sensor_number=sensor_number, port=com_port)
-                ms.send_measurement_range(
-                    (r4_range_dict[r4_widget.currentText()],) * 12)
-
-                answers = [ms.full_request((0,) * 12) for _ in range(15)]
                 try:
-                    self.entries[r_labels_str[index]].setText("{:2.5f}".format(
-                        sum([answer[int(sensor_widget.currentText()) - 1] for answer in answers[5:]])/10))
-                except IndexError:
-                    print("No sensor there")
+                    ms.send_measurement_range(
+                        (r4_range_dict[r4_widget.currentText()],) * 12)
+
+                    answers = [ms.full_request((0,) * 12) for _ in range(15)]
+                    try:
+                        self.entries[r_labels_str[index]].setText("{:2.5f}".format(
+                            sum([answer[int(sensor_widget.currentText()) - 1] for answer in answers[5:]])/10))
+                    except IndexError:
+                        print("No sensor there")
+                except:
+                    ms.close()
+
 
             return measure_u
 

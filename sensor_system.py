@@ -35,6 +35,9 @@ class MS_ABC(ABC):
     def set_port(self, port: str):
         self.ser.port = port
 
+    def close(self):
+        self.ser.close()
+
     def open(self):
         try:
             self.ser.open()
