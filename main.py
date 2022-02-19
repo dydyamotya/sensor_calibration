@@ -63,6 +63,9 @@ class MS_Uni():
     def full_request(self, values):
         return self.ms.full_request(values[:self.sensors_number], self.ms.REQUEST_U)[0]
 
+    def close(self):
+        self.ms.close()
+
 
 class MainWidget(QtWidgets.QWidget):
     def __init__(self, *args, **kwargs):
