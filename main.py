@@ -135,8 +135,11 @@ class OneSensorFrame(QtWidgets.QWidget):
                     f"{com_port}, {r4_widget.currentText()}, {sensor_widget.currentText()}")
                 ms = MS_Uni(sensor_number=sensor_number, port=com_port)
                 try:
-                    ms.send_measurement_range(
-                        (r4_range_dict[r4_widget.currentText()],) * 12)
+                    if r4_widget.currentText() in r4_str_values:
+                        ms.send_measurement_range(
+                            (r4_range_dict[r4_widget.currentText()],) * 12)
+                    else:
+                        pass
 
                     answers = [ms.full_request((0,) * 12) for _ in range(15)]
                     try:
