@@ -3,7 +3,8 @@ from scipy.optimize import curve_fit
 from serial.tools.list_ports import comports
 import sys
 import platform
-from sensor_system import MS12, MS4
+from sensor_system import MS12, MS4, MS_Uni
+from calibration import CalibrationProxyFrame
 
 from PySide2 import QtWidgets, QtCore, QtGui
 from pyside_constructor_widgets.widgets import ComPortWidget
@@ -46,30 +47,11 @@ def get_float(x):
         return 0
 
 
-class MS_Uni():
-    def __init__(self, sensor_number, port):
-        self.sensors_number = sensor_number
-        if sensor_number == 4:
-            self.ms = MS4(port)
-        elif sensor_number == 12:
-            self.ms = MS12(port)
-        else:
-            raise Exception("Wrong port number")
-
-    def send_measurement_range(self, values):
-        self.ms.send_measurement_range(values[:self.sensors_number])
-        self.ms.recieve_measurement_range_answer()
-
-    def full_request(self, values):
-        return self.ms.full_request(values[:self.sensors_number], self.ms.REQUEST_U)[0]
-
-    def close(self):
-        self.ms.close()
-
 
 class MainWidget(QtWidgets.QWidget):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, debug_level, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.debug_level = debug_level
         self._init_ui()
 
     def _init_ui(self):
@@ -78,10 +60,14 @@ class MainWidget(QtWidgets.QWidget):
 
         self.settings_widget = EquipmentSettings()
         layout.addWidget(self.settings_widget)
+
+        self.calibration_proxy_frame = CalibrationProxyFrame(self)
+        layout.addWidget(self.calibration_proxy_frame)
+
         hbox_layout = QtWidgets.QHBoxLayout()
         layout.addLayout(hbox_layout)
         for _ in range(3):
-            hbox_layout.addWidget(OneSensorFrame(self, self.settings_widget))
+            hbox_layout.addWidget(OneSensorFrame(self, self.settings_widget, self.debug_level))
 
 
 class PlusWidget(QtWidgets.QWidget):
@@ -98,9 +84,10 @@ class PlusWidget(QtWidgets.QWidget):
 
 
 class OneSensorFrame(QtWidgets.QWidget):
-    def __init__(self, master, settings, *args, **kwargs):
+    def __init__(self, master, settings, debug_level, *args, **kwargs):
         super(OneSensorFrame, self).__init__(master, *args, **kwargs)
         self.settings = settings
+        self.debug_level = debug_level
         self.labels = []
 
         layout = QtWidgets.QGridLayout()
@@ -141,7 +128,7 @@ class OneSensorFrame(QtWidgets.QWidget):
                     else:
                         pass
 
-                    answers = [ms.full_request((0,) * 12) for _ in range(15)]
+                    answers = [ms.full_request((0,) * 12)[0] for _ in range(15)]
                     try:
                         self.entries[r_labels_str[index]].setText("{:2.5f}".format(
                             sum([answer[int(sensor_widget.currentText()) - 1] for answer in answers[5:]])/10))
@@ -218,8 +205,6 @@ class OneSensorFrame(QtWidgets.QWidget):
         calc_button = QtWidgets.QPushButton(text="Calc coeffs")
         calc_button.clicked.connect(click_calc_button)
 
-        test_button = QtWidgets.QPushButton(text="Test values")
-        test_button.clicked.connect(self.fill_with_test_data)
 
         layout.addWidget(slice_widget_1, row, 0)
         layout.addWidget(slice_widget_2, row, 1)
@@ -233,7 +218,11 @@ class OneSensorFrame(QtWidgets.QWidget):
         layout.addWidget(result_widget_1, row, 1)
         row += 1
 
-        layout.addWidget(test_button, row, 0)
+        if self.debug_level == logging.DEBUG:
+            test_button = QtWidgets.QPushButton(text="Test values")
+            test_button.clicked.connect(self.fill_with_test_data)
+            layout.addWidget(test_button, row, 0)
+
         layout.addWidget(result_widget_2, row, 1)
 
     def fill_with_test_data(self):
@@ -301,10 +290,10 @@ def main():
     parser.add_argument("--debug", action="store_true")
 
     args = parser.parse_args()
+    level = logging.DEBUG if args.debug else logging.INFO
+    logging.basicConfig(level=level)
 
-    logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
-
-    window = MainWidget()
+    window = MainWidget(level)
     window.setWindowTitle("Sensor calibrator")
     window.show()
 

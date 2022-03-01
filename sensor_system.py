@@ -260,3 +260,24 @@ class MSEmulator(MS_ABC):
 
     def action(self, values):
         pass
+
+class MS_Uni():
+    def __init__(self, sensor_number, port):
+        self.sensors_number = sensor_number
+        if sensor_number == 4:
+            self.ms = MS4(port)
+        elif sensor_number == 12:
+            self.ms = MS12(port)
+        else:
+            raise Exception("Wrong port number")
+
+    def send_measurement_range(self, values):
+        self.ms.send_measurement_range(values[:self.sensors_number])
+        self.ms.recieve_measurement_range_answer()
+
+    def full_request(self, values):
+        return self.ms.full_request(values[:self.sensors_number], self.ms.REQUEST_U)
+
+    def close(self):
+        self.ms.close()
+
