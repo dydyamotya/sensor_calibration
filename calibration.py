@@ -108,7 +108,6 @@ class CalibrationWidget(QtWidgets.QWidget):
         voltages = (voltage, ) * self.sensor_number
         averaging_massive = np.zeros(
             (self.sensor_number, steps_per_measurement))
-        self.ms = MS_Uni(self.sensor_number, self.comport)
         try:
             us, rs = self.full_request_until_result(voltages)
 
@@ -123,9 +122,6 @@ class CalibrationWidget(QtWidgets.QWidget):
             raise
         else:
             return averaging_massive
-        finally:
-            self.ms.close()
-            self.ms = None
 
     @staticmethod
     def calculate_masked_mean(array):
@@ -134,13 +130,18 @@ class CalibrationWidget(QtWidgets.QWidget):
 
     @Slot()
     def get_r0(self):
-        r0_voltage = self.r0_voltage.get_value()
-        steps_per_measurement = 10
-        averaging_massive = self.get_average_massive(r0_voltage,
-                                                    steps_per_measurement,
-                                                    2.0)
+        try:
+            self.ms = MS_Uni(self.sensor_number, self.comport)
+            r0_voltage = self.r0_voltage.get_value()
+            steps_per_measurement = 10
+            averaging_massive = self.get_average_massive(r0_voltage,
+                                                        steps_per_measurement,
+                                                        2.0)
 
-        self.per_sensor.set_r0s(self.calculate_masked_mean(averaging_massive))
+            self.per_sensor.set_r0s(self.calculate_masked_mean(averaging_massive))
+        except MS_ABC.MSException:
+            self.ms.close()
+            self.ms = None
 
 
     def loop_ms(self):
@@ -161,26 +162,29 @@ class CalibrationWidget(QtWidgets.QWidget):
             [voltage_row for i in range(self.sensor_number)])
 
         logger.debug(voltage_row)
+        try:
+            for idx, voltage_dot in enumerate(voltage_row):
+                if self.stopped:
+                    self.last_idx = idx
+                    return
+                logger.debug(f"{idx} {voltage_dot}")
 
-        for idx, voltage_dot in enumerate(voltage_row):
-            if self.stopped:
-                self.last_idx = idx
-                return
-            logger.debug(f"{idx} {voltage_dot}")
+                averaging_massive = self.get_average_massive(voltage_dot, steps_per_measurement, sleep_time)
 
-            averaging_massive = self.get_average_massive(voltage_dot, steps_per_measurement, sleep_time)
+                self.resistances[:, idx] = self.calculate_masked_mean(averaging_massive)
 
-            self.resistances[:, idx] = self.calculate_masked_mean(averaging_massive)
-
-            if idx % dots_to_draw == 0:
-                self.cal_plot_widget.set_lines(
-                    self.voltages[:, :idx], self.per_sensor.process_resistances(self.resistances[:, :idx]))
-
-        self.full_request_until_result((0, ) * self.sensor_number)
-        self.stopped = True
-        self.last_idx = -1
-        self.ms.close()
-        self.ms = None
+                if idx % dots_to_draw == 0:
+                    self.cal_plot_widget.set_lines(
+                        self.voltages[:, :idx], self.per_sensor.process_resistances(self.resistances[:, :idx]))
+        except MS_ABC.MSException:
+            pass
+        else:
+            self.full_request_until_result((0, ) * self.sensor_number)
+        finally:
+            self.stopped = True
+            self.last_idx = -1
+            self.ms.close()
+            self.ms = None
 
     def full_request_until_result(self, values):
         for i in range(20):
