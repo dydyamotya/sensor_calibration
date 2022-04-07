@@ -1,17 +1,17 @@
 from threading import Thread
 from PySide2 import QtWidgets
-from PySide2.QtCore import Signal, Slot, Qt
 from PySide2.QtGui import QPixmap, QColor
-from sensor_system import MS_Uni
+from PySide2.QtCore import Signal, Slot, Qt
+from sensor_system import MS_Uni, MS_ABC
 from misc import TypeCheckLineEdit
 import time
 
-import matplotlib as mpl
 from matplotlib import figure
 from matplotlib.lines import Line2D
 from matplotlib.colors import get_named_colors_mapping
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 import numpy as np
+import numpy.ma as ma
 
 import logging
 logger = logging.getLogger(__name__)
@@ -99,36 +99,49 @@ class CalibrationWidget(QtWidgets.QWidget):
         self.stopped = True
         if self.thread:
             self.thread.join()
-            self.ms.full_request((0, ) * self.sensor_number)
+            self.full_request_until_result((0, ) * self.sensor_number)
         if self.ms:
             self.ms.close()
         self.ms = None
+
+    def get_average_massive(self, voltage: float, steps_per_measurement: int, sleep_time: float):
+        voltages = (voltage, ) * self.sensor_number
+        averaging_massive = np.zeros(
+            (self.sensor_number, steps_per_measurement))
+        self.ms = MS_Uni(self.sensor_number, self.comport)
+        try:
+            us, rs = self.full_request_until_result(voltages)
+
+            time.sleep(sleep_time)
+
+            for i in range(steps_per_measurement):
+                time.sleep(0.2)
+                us, rs = self.full_request_until_result(voltages)
+                averaging_massive[:, i] = rs
+
+        except MS_ABC.MSException:
+            raise
+        else:
+            return averaging_massive
+        finally:
+            self.ms.close()
+            self.ms = None
+
+    @staticmethod
+    def calculate_masked_mean(array):
+        masked_values = ma.masked_values(array, 655.35)
+        return masked_values.mean(axis=1).filled(655.35)
 
     @Slot()
     def get_r0(self):
         r0_voltage = self.r0_voltage.get_value()
         steps_per_measurement = 10
-        averaging_massive = np.zeros(
-            (self.sensor_number, steps_per_measurement))
-        self.ms = MS_Uni(self.sensor_number, self.comport)
-        try:
-            us, rs = self.ms.full_request(
-                (r0_voltage, ) * self.sensor_number)
-            time.sleep(2)
-            for i in range(steps_per_measurement):
-                time.sleep(0.2)
-                us, rs = self.ms.full_request(
-                    (r0_voltage, ) * self.sensor_number)
-                while any(rs == 655.35):
-                    time.sleep(0.2)
-                    us, rs = self.ms.full_request(
-                        (r0_voltage, ) * self.sensor_number)
-                averaging_massive[:, i] = rs
-                logger.debug(f"{us}, {rs}")
-            self.per_sensor.set_r0s(np.mean(averaging_massive, axis=1))
-        finally:
-            self.ms.close()
-            self.ms = None
+        averaging_massive = self.get_average_massive(r0_voltage,
+                                                    steps_per_measurement,
+                                                    2.0)
+
+        self.per_sensor.set_r0s(self.calculate_masked_mean(averaging_massive))
+
 
     def loop_ms(self):
         if self.ms:
@@ -147,41 +160,38 @@ class CalibrationWidget(QtWidgets.QWidget):
         self.voltages = np.vstack(
             [voltage_row for i in range(self.sensor_number)])
 
-        averaging_massive = np.zeros(
-            (self.sensor_number, steps_per_measurement))
-
         logger.debug(voltage_row)
 
         for idx, voltage_dot in enumerate(voltage_row):
+            if self.stopped:
+                self.last_idx = idx
+                return
             logger.debug(f"{idx} {voltage_dot}")
-            us, rs = self.ms.full_request(
-                (voltage_dot, ) * self.sensor_number)
-            time.sleep(sleep_time)
-            for i in range(steps_per_measurement):
-                if self.stopped:
-                    self.last_idx = idx
-                    return
-                time.sleep(0.1)
-                us, rs = self.ms.full_request(
-                    (voltage_dot, ) * self.sensor_number)
-                while any(rs == 655.35):
-                    time.sleep(0.1)
-                    us, rs = self.ms.full_request(
-                        (voltage_dot, ) * self.sensor_number)
-                averaging_massive[:, i] = rs
-                logger.debug(f"{us}, {rs}")
 
-            self.resistances[:, idx] = np.mean(averaging_massive, axis=1)
+            averaging_massive = self.get_average_massive(voltage_dot, steps_per_measurement, sleep_time)
+
+            self.resistances[:, idx] = self.calculate_masked_mean(averaging_massive)
 
             if idx % dots_to_draw == 0:
                 self.cal_plot_widget.set_lines(
                     self.voltages[:, :idx], self.per_sensor.process_resistances(self.resistances[:, :idx]))
 
-        self.ms.full_request((0, ) * self.sensor_number)
+        self.full_request_until_result((0, ) * self.sensor_number)
         self.stopped = True
         self.last_idx = -1
         self.ms.close()
         self.ms = None
+
+    def full_request_until_result(self, values):
+        for i in range(20):
+            try:
+                us, rs = self.ms.full_request(values)
+            except MS_ABC.MSException:
+                logger.debug(f"Full request try: {i}")
+            else:
+                return us, rs
+        else:
+            raise MS_ABC.MSException("Failed to obtain result somehow")
 
     def recalc_signal_handler(self):
         if self.stopped:
@@ -190,14 +200,15 @@ class CalibrationWidget(QtWidgets.QWidget):
                 self.cal_plot_widget.set_lines(*self.get_data())
 
     def get_data(self):
-        voltages = self.voltages[:, :self.last_idx]
-        temperatures = self.per_sensor.process_resistances(self.resistances[:, :self.last_idx])
+        voltages=self.voltages[:, :self.last_idx]
+        temperatures=self.per_sensor.process_resistances(
+            self.resistances[:, :self.last_idx])
         return voltages, temperatures
 
     def get_params(self):
-        r0s, rns, alphas = [], [], []
-        initial_voltage, steps_per_measurement, end_voltage, sleep_time, dots_to_draw, microstep = self.calibration_settings.get_variables()
-        vmax = self.get_data()[0][0][-1]
+        r0s, rns, alphas=[], [], []
+        initial_voltage, steps_per_measurement, end_voltage, sleep_time, dots_to_draw, microstep=self.calibration_settings.get_variables()
+        vmax=self.get_data()[0][0][-1]
         for r0, rn, alpha in self.per_sensor.get_variables():
             r0s.append(r0)
             rns.append(rn)
@@ -205,26 +216,25 @@ class CalibrationWidget(QtWidgets.QWidget):
         return r0s, rns, alphas, self.per_sensor.T0_entry.get_value(), vmax
 
 
-
 class PerSensorSettings(QtWidgets.QWidget):
     def __init__(self, parent):
         super().__init__(parent)
-        layout = QtWidgets.QVBoxLayout(self)
+        layout=QtWidgets.QVBoxLayout(self)
 
-        sensor_number = parent.sensor_number
+        sensor_number=parent.sensor_number
 
-        self.sensor_widgets = tuple(OneSensorWidget(self, i)
+        self.sensor_widgets=tuple(OneSensorWidget(self, i)
                                     for i in range(sensor_number))
 
-        self.T0_entry = TypeCheckLineEdit(self, float, 40.0)
+        self.T0_entry=TypeCheckLineEdit(self, float, 40.0)
         layout.addWidget(QtWidgets.QLabel("T0"))
         layout.addWidget(self.T0_entry)
 
-        column_layout = QtWidgets.QHBoxLayout()
+        column_layout=QtWidgets.QHBoxLayout()
         layout.addLayout(column_layout)
 
         for name_col in ["R0", "Rn", "alpha"]:
-            label = QtWidgets.QLabel(name_col, self)
+            label=QtWidgets.QLabel(name_col, self)
             label.setAlignment(Qt.AlignCenter)
             column_layout.addWidget(label)
 
@@ -236,8 +246,8 @@ class PerSensorSettings(QtWidgets.QWidget):
             yield sensor_widget.get_variables()
 
     def process_resistances(self, resistances: np.ndarray) -> np.ndarray:
-        T0 = self.T0_entry.get_value()
-        temperatures = []
+        T0=self.T0_entry.get_value()
+        temperatures=[]
         for resistance_row, (r0, rn, alpha) in zip(resistances, self.get_variables()):
             temperatures.append(
                 ((resistance_row - rn)/(r0 - rn) - 1)/alpha + T0)
@@ -257,27 +267,26 @@ class OneSensorWidget(QtWidgets.QWidget):
 
     def __init__(self, parent, number):
         super().__init__(parent)
-        layout = QtWidgets.QHBoxLayout(self)
+        layout=QtWidgets.QHBoxLayout(self)
 
-        self.number = number
+        self.number=number
 
-        self.r0 = TypeCheckLineEdit(self, float, 16.0)
-        self.rn = TypeCheckLineEdit(self, float, 1.0)
-        self.alpha = TypeCheckLineEdit(self, float, 0.003)
+        self.r0=TypeCheckLineEdit(self, float, 16.0)
+        self.rn=TypeCheckLineEdit(self, float, 1.0)
+        self.alpha=TypeCheckLineEdit(self, float, 0.003)
 
         layout.addWidget(QtWidgets.QLabel(str(number), self))
         layout.addWidget(self.r0)
         layout.addWidget(self.rn)
         layout.addWidget(self.alpha)
 
-        pixmap = QPixmap(20, 20)
-        color = QColor(get_named_colors_mapping()[colors_for_lines[number]])
+        pixmap=QPixmap(20, 20)
+        color=QColor(get_named_colors_mapping()[colors_for_lines[number]])
         pixmap.fill(color)
-        pixmap_label = QtWidgets.QLabel(self)
+        pixmap_label=QtWidgets.QLabel(self)
         pixmap_label.setPixmap(pixmap)
 
         layout.addWidget(pixmap_label)
-
 
     def get_variables(self):
         return (self.r0.get_value(), self.rn.get_value(), self.alpha.get_value())
@@ -296,13 +305,13 @@ class CalibrationButtons(QtWidgets.QWidget):
     def __init__(self, parent):
         super().__init__(parent)
 
-        layout = QtWidgets.QHBoxLayout(self)
+        layout=QtWidgets.QHBoxLayout(self)
 
-        self.start_button = QtWidgets.QPushButton("Start", self)
-        self.stop_button = QtWidgets.QPushButton("Stop", self)
-        self.get_r0_button = QtWidgets.QPushButton("Get R0", self)
+        self.start_button=QtWidgets.QPushButton("Start", self)
+        self.stop_button=QtWidgets.QPushButton("Stop", self)
+        self.get_r0_button=QtWidgets.QPushButton("Get R0", self)
 
-        self.buttons = [self.start_button,
+        self.buttons=[self.start_button,
                         self.stop_button, self.get_r0_button]
 
         self.start_button.clicked.connect(parent.start_ms)
@@ -325,9 +334,9 @@ class CalibrationButtons(QtWidgets.QWidget):
 class CalibrationSettings(QtWidgets.QWidget):
     def __init__(self, parent):
         super().__init__(parent)
-        layout = QtWidgets.QFormLayout(self)
+        layout=QtWidgets.QFormLayout(self)
 
-        self.widgets_names = [
+        self.widgets_names=[
             "Initial voltage",
             "Steps",
             "End voltage",
@@ -336,9 +345,9 @@ class CalibrationSettings(QtWidgets.QWidget):
             "Microstep"
         ]
 
-        self.widget_types = [float, int, float, float, int, float]
-        self.widget_defaults = [0.1, 10, 5.1, 2.0, 1, 0.01]
-        self.entries = [TypeCheckLineEdit(self, type_, default_value) for widget_name, type_, default_value in zip(
+        self.widget_types=[float, int, float, float, int, float]
+        self.widget_defaults=[0.1, 10, 5.1, 2.0, 1, 0.01]
+        self.entries=[TypeCheckLineEdit(self, type_, default_value) for widget_name, type_, default_value in zip(
             self.widgets_names, self.widget_types, self.widget_defaults)]
         for widget_name, entry in zip(self.widgets_names, self.entries):
             layout.addRow(widget_name,  entry)
@@ -351,19 +360,19 @@ class CalibrationSettings(QtWidgets.QWidget):
 class CalibrationPlotWidget(QtWidgets.QWidget):
     def __init__(self, parent):
         super().__init__(parent)
-        fig = figure.Figure()
-        ax = fig.add_subplot(1, 1, 1)
-        self.canvas = FigureCanvasQTAgg(figure=fig)
-        layout = QtWidgets.QVBoxLayout()
+        fig=figure.Figure()
+        ax=fig.add_subplot(1, 1, 1)
+        self.canvas=FigureCanvasQTAgg(figure=fig)
+        layout=QtWidgets.QVBoxLayout()
         self.setLayout(layout)
         layout.addWidget(self.canvas)
-        toolbox = NavigationToolbar2QT(self.canvas, self)
+        toolbox=NavigationToolbar2QT(self.canvas, self)
         layout.addWidget(toolbox)
 
         ax.set_xlabel("Voltage, V")
         ax.set_ylabel("Temperature, C")
 
-        self.lines_dict = {i: Line2D([], [], color=color)
+        self.lines_dict={i: Line2D([], [], color=color)
                            for i, color in enumerate(colors_for_lines)}
 
         for line in self.lines_dict.values():
@@ -378,16 +387,19 @@ class CalibrationPlotWidget(QtWidgets.QWidget):
             line.set_ydata(temperature_row)
         self.canvas.draw()
 
+
 class SaveButtons(QtWidgets.QWidget):
     def __init__(self, parent):
         super().__init__(parent)
 
-        self.parent_py = parent
+        self.parent_py=parent
 
-        layout = QtWidgets.QHBoxLayout(self)
+        layout=QtWidgets.QHBoxLayout(self)
 
-        self.save_calibration_button = QtWidgets.QPushButton("Save calibration", self)
-        self.save_parameters_button = QtWidgets.QPushButton("Save parameters", self)
+        self.save_calibration_button=QtWidgets.QPushButton(
+            "Save calibration", self)
+        self.save_parameters_button=QtWidgets.QPushButton(
+            "Save parameters", self)
 
         self.save_calibration_button.clicked.connect(self.save_calibration)
         self.save_parameters_button.clicked.connect(self.save_parameters)
@@ -396,41 +408,46 @@ class SaveButtons(QtWidgets.QWidget):
         layout.addWidget(self.save_parameters_button)
 
     def save_calibration(self):
-        filename, filters = QtWidgets.QFileDialog.getSaveFileName(self, "Save Calibration", "./tests", "Calibration File (*.cal)")
+        filename, filters=QtWidgets.QFileDialog.getSaveFileName(
+            self, "Save Calibration", "./tests", "Calibration File (*.cal)")
         if filename:
-            voltages, temperatures = self.parent_py.get_data()
-            items = voltages.shape[1]
+            voltages, temperatures=self.parent_py.get_data()
+            items=voltages.shape[1]
             with open(filename, "w") as fd:
                 fd.write(f"Items {items:d}\n")
-                new_array = []
+                new_array=[]
                 for voltage, temperature in zip(voltages, temperatures):
                     new_array.append(voltage)
                     new_array.append(temperature)
 
-                new_array = np.array(new_array).T
-                np.savetxt(fd, new_array, fmt='%.6f', delimiter="\t", newline="\t\n")
+                new_array=np.array(new_array).T
+                np.savetxt(fd, new_array, fmt='%.6f',
+                           delimiter="\t", newline="\t\n")
 
     def save_parameters(self):
-        filename, filters = QtWidgets.QFileDialog.getSaveFileName(self, "Save Parameters", "./tests", "Parameters File (*.par)")
+        filename, filters=QtWidgets.QFileDialog.getSaveFileName(
+            self, "Save Parameters", "./tests", "Parameters File (*.par)")
         if filename:
-            r0s, rns, alphas, t0, Vmax = self.parent_py.get_params()
+            r0s, rns, alphas, t0, Vmax=self.parent_py.get_params()
             with open(filename, "w") as fd:
                 fd.write("[R0]\n")
                 for idx, r0 in enumerate(r0s):
-                    to_file = "R0_{:d}={:f}\n".format(idx, r0*100).replace(".", ",")
+                    to_file="R0_{:d}={:f}\n".format(
+                        idx, r0*100).replace(".", ",")
                     fd.write(to_file)
                 fd.write("[Rc]\n")
                 for idx, rn in enumerate(rns):
-                    to_file = "Rc_{:d}={:f}\n".format(idx, rn*100).replace(".", ",")
+                    to_file="Rc_{:d}={:f}\n".format(
+                        idx, rn*100).replace(".", ",")
                     fd.write(to_file)
                 fd.write("[a]\n")
                 for idx, alpha in enumerate(alphas):
-                    to_file = "a0_{:d}={:f}\n".format(idx, alpha).replace(".", ",")
+                    to_file="a0_{:d}={:f}\n".format(
+                        idx, alpha).replace(".", ",")
                     fd.write(to_file)
                 fd.write("[T0]\n")
-                to_file = "T0={:f}\n".format(t0).replace(".", ",")
+                to_file="T0={:f}\n".format(t0).replace(".", ",")
                 fd.write(to_file)
                 fd.write("[Vmax]\n")
-                to_file = "Vmax={:f}\n".format(Vmax).replace(".", ",")
+                to_file="Vmax={:f}\n".format(Vmax).replace(".", ",")
                 fd.write(to_file)
-

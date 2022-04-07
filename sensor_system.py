@@ -5,6 +5,10 @@ from abc import ABC, abstractmethod
 import numpy as np
 import serial
 
+import logging 
+
+logger = logging.getLogger(__name__)
+
 
 class MS_ABC(ABC):
     """Класс реализует базовый класс для сенсорных приборов"""
@@ -42,7 +46,7 @@ class MS_ABC(ABC):
         try:
             self.ser.open()
         except serial.SerialException:
-            print("Bad port. Not opened")
+            logger.debug("Bad port. Not opened")
         except Exception as e:
             raise e
 
@@ -78,9 +82,11 @@ class MS_ABC(ABC):
 
     def send_us(self, us: typing.Iterable) -> int:
         """:returns number of sent bytes"""
+        logger.debug(f"Sending Us, {us}")
         return self._send(us, self._convert_u)
 
     def send_rs(self, rs: typing.Iterable):
+        logger.debug(f"Sending Rs, {rs}")
         """:returns number of sent bytes"""
         return self._send(rs, self._convert_r)
 
@@ -89,6 +95,7 @@ class MS_ABC(ABC):
         us - voltage, measured on sensors,
         rs - resistance of heaters"""
         # todo: do you really need that method????
+        logger.debug("Full request in")
         if request_type == self.REQUEST_R:
             self.send_rs(values)
             return self.recieve_answer()
@@ -99,6 +106,7 @@ class MS_ABC(ABC):
             raise MS_ABC.MSException("Wrong request type")
 
     def recieve_answer(self) -> typing.Tuple[np.ndarray, np.ndarray]:
+        logger.debug("Start recieving")
         us = np.empty(self.sensors_number, dtype=np.float32)
         rs = np.empty(self.sensors_number, dtype=np.float32)
         # recieved = bytes()
@@ -109,13 +117,14 @@ class MS_ABC(ABC):
         u_index = 5
         recieved = self.ser.read(
             begin_key_index + self.sensors_number * data_one_sensor_length + end_key)
+        logger.debug(recieved)
         if recieved[-end_key:] != self.END_KEY:
-            print(recieved)
+            logger.debug(recieved)
             while self.ser.read(1):
                 pass
             raise MS_ABC.MSException("END_KEY is not matching")
         if recieved[:begin_key_index] != self.BEGIN_KEY:
-            print(recieved)
+            logger.debug(recieved)
             raise MS_ABC.MSException("BEGIN_KEY is not matching")
         for i in range(self.sensors_number):
             start_index = begin_key_index + i * data_one_sensor_length
@@ -125,6 +134,7 @@ class MS_ABC(ABC):
             us[i] = self._back_convert_u(
                 int.from_bytes(recieved[start_index + r_index:start_index + u_index],
                                "little", signed=False))
+        logger.debug(f"{us}{rs}")
         return us, rs
 
     def send_measurement_range(self, values: typing.Union[typing.Iterable, typing.Sized]):

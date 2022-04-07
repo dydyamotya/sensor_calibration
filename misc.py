@@ -1,5 +1,4 @@
 from PySide2 import QtWidgets
-from PySide2.QtCore import Signal, Slot, Qt
 
 class TypeCheckLineEdit(QtWidgets.QLineEdit):
     def __init__(self, parent, type_, default_value):
