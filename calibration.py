@@ -162,12 +162,12 @@ class CalibrationWidget(QtWidgets.QWidget):
             [voltage_row for i in range(self.sensor_number)])
 
         logger.debug(voltage_row)
-        try:
-            for idx, voltage_dot in enumerate(voltage_row):
-                if self.stopped:
-                    self.last_idx = idx
-                    return
-                logger.debug(f"{idx} {voltage_dot}")
+        for idx, voltage_dot in enumerate(voltage_row):
+            if self.stopped:
+                self.last_idx = idx
+                return
+            logger.debug(f"{idx} {voltage_dot}")
+            try:
 
                 averaging_massive = self.get_average_massive(voltage_dot, steps_per_measurement, sleep_time)
 
@@ -176,15 +176,17 @@ class CalibrationWidget(QtWidgets.QWidget):
                 if idx % dots_to_draw == 0:
                     self.cal_plot_widget.set_lines(
                         self.voltages[:, :idx], self.per_sensor.process_resistances(self.resistances[:, :idx]))
-        except MS_ABC.MSException:
-            pass
-        else:
-            self.full_request_until_result((0, ) * self.sensor_number)
-        finally:
-            self.stopped = True
-            self.last_idx = -1
-            self.ms.close()
-            self.ms = None
+            except MS_ABC.MSException:
+                self.last_idx = idx
+                self.stopped = True
+                self.ms.close()
+                self.ms = None
+                return
+        self.full_request_until_result((0, ) * self.sensor_number)
+        self.stopped = True
+        self.last_idx = -1
+        self.ms.close()
+        self.ms = None
 
     def full_request_until_result(self, values):
         for i in range(20):
