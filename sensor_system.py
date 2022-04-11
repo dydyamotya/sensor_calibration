@@ -85,30 +85,14 @@ class MS_ABC(ABC):
             recieved += self.ser.read(1)
         return recieved
 
-    def send_us(self, us: typing.Iterable, sensor_types_list: typing.Sequence):
-        """:returns number of sent bytes"""
-        logger.debug(f"Sending Us, {us}")
-        return self._send(us, self.SEND_U, sensor_types_list)
-
-    def send_rs(self, rs: typing.Iterable, sensor_types_list: typing.Sequence):
-        logger.debug(f"Sending Rs, {rs}")
-        """:returns number of sent bytes"""
-        return self._send(rs, self.SEND_R, sensor_types_list)
-
     def full_request(self, values: typing.Iterable, request_type, sensor_types_list: typing.Sequence):
         """:returns us, rs
         us - voltage, measured on sensors,
         rs - resistance of heaters"""
-        # todo: do you really need that method????
         logger.debug("Full request in")
-        if request_type == self.REQUEST_R:
-            self.send_rs(values, sensor_types_list)
-            return self.recieve_answer()
-        elif request_type == self.REQUEST_U:
-            self.send_us(values, sensor_types_list)
-            return self.recieve_answer()
-        else:
-            raise MS_ABC.MSException("Wrong request type")
+        logger.debug(f"Sending values, {values}")
+        self._send(values, request_type, sensor_types_list)
+        return self.recieve_answer()
 
     def recieve_answer(self) -> typing.Tuple[np.ndarray, np.ndarray]:
         logger.debug("Start recieving")
@@ -271,7 +255,7 @@ class MSEmulator(MS_ABC):
         self.sensors_number = sensor_number
         self.struct = struct.Struct(">f" + self.sensors_number * "f")
 
-    def full_request(self, values: np.ndarray, request_type):
+    def full_request(self, values: np.ndarray, request_type, sensor_types_list):
         us = np.ones(shape=(self.sensors_number,)) * np.random.normal(0, 2, self.sensors_number) - values * 2
         rs = np.ones(shape=(self.sensors_number,)) * 15 + np.random.normal(0, 0.2, self.sensors_number) + values * 5
         return us, rs

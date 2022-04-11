@@ -208,6 +208,8 @@ class CalibrationWidget(QtWidgets.QWidget):
     def full_request_until_result(self, values):
         sensor_types_list = [send_code for checkbox_state, send_code in zip(
             self.css_checkboxes.collect_checkboxes(), values_for_css_boxes) if checkbox_state]
+
+        logger.debug(f"{sensor_types_list}")
         for i in range(20):
             try:
                 us, rs = self.ms.full_request(values, sensor_types_list)
