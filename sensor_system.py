@@ -9,6 +9,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+import itertools, functools, operator
+
 
 class MS_ABC(ABC):
     """Класс реализует базовый класс для сенсорных приборов"""
@@ -17,6 +19,9 @@ class MS_ABC(ABC):
     SEND_U = bytes((0x08,))
     SEND_R = bytes((0x88,))
     SEND_M = bytes((0x20,))
+    SEND_CSS_1_4 = 0x01
+    SEND_CSS_5_8 = 0x02
+    SEND_CSS_9_12 = 0x04
 
     REQUEST_U = 0
     REQUEST_R = 1
@@ -80,27 +85,27 @@ class MS_ABC(ABC):
             recieved += self.ser.read(1)
         return recieved
 
-    def send_us(self, us: typing.Iterable) -> int:
+    def send_us(self, us: typing.Iterable, sensor_types_list: typing.Sequence):
         """:returns number of sent bytes"""
         logger.debug(f"Sending Us, {us}")
-        return self._send(us, self._convert_u)
+        return self._send(us, self.SEND_U, sensor_types_list)
 
-    def send_rs(self, rs: typing.Iterable):
+    def send_rs(self, rs: typing.Iterable, sensor_types_list: typing.Sequence):
         logger.debug(f"Sending Rs, {rs}")
         """:returns number of sent bytes"""
-        return self._send(rs, self._convert_r)
+        return self._send(rs, self.SEND_R, sensor_types_list)
 
-    def full_request(self, values: typing.Iterable, request_type):
+    def full_request(self, values: typing.Iterable, request_type, sensor_types_list: typing.Sequence):
         """:returns us, rs
         us - voltage, measured on sensors,
         rs - resistance of heaters"""
         # todo: do you really need that method????
         logger.debug("Full request in")
         if request_type == self.REQUEST_R:
-            self.send_rs(values)
+            self.send_rs(values, sensor_types_list)
             return self.recieve_answer()
         elif request_type == self.REQUEST_U:
-            self.send_us(values)
+            self.send_us(values, sensor_types_list)
             return self.recieve_answer()
         else:
             raise MS_ABC.MSException("Wrong request type")
@@ -164,10 +169,14 @@ class MS_ABC(ABC):
             raise MS_ABC.MSException("SEND_M in range is not matching")
         return recieved
 
+    def _form_send_key(self, key: bytes, sensor_types_list: typing.Collection):
+        return bytes((functools.reduce(operator.or_, itertools.chain(key, sensor_types_list)), ))
+
+
     # Abstract methods
     # =========================
     @abstractmethod
-    def _send(self, *args, **kwargs):
+    def _send(self, values: typing.Collection, request_type: int, sensor_types_list: typing.Collection):
         raise NotImplementedError
 
     @abstractmethod
@@ -191,12 +200,18 @@ class MS12(MS_ABC):
         self.sensors_number = 12
         self.struct = struct.Struct(">" + (self.sensors_number + 1) * "f")
 
-    def _send(self, values: typing.Union[typing.Iterable, typing.Sized], convert_func: typing.Callable) -> int:
+    def _send(self, values: typing.Collection, request_type: int, sensor_types_list: typing.Collection) -> int:
         if len(values) != self.sensors_number:
             raise MS_ABC.MSException("Must be iterable of 12 length")
+        if request_type == self.REQUEST_U:
+            send_key, convert_func = self.SEND_U, self._convert_u
+        elif request_type == self.REQUEST_R:
+            send_key, convert_func = self.SEND_R, self._convert_r
+        else:
+            raise MS_ABC.MSException(f"Wrong request_type arg, with value {request_type}")
         sent_bytes = 0
         sent_bytes += self.ser.write(self.BEGIN_KEY)
-        sent_bytes += self.ser.write(self.SEND_U)
+        sent_bytes += self.ser.write(self._form_send_key(send_key, sensor_types_list))
         for number in values:
             sent_bytes += self.ser.write(convert_func(number))
         sent_bytes += self.ser.write(bytes(8))  # protocol issue
@@ -223,12 +238,18 @@ class MS4(MS_ABC):
     def action(self, values):
         pass
 
-    def _send(self, values: typing.Union[typing.Iterable, typing.Sized], convert_func: typing.Callable) -> int:
+    def _send(self, values: typing.Collection, request_type: int, sensor_types_list: typing.Collection) -> int:
         if len(values) != self.sensors_number:
-            raise MS_ABC.MSException("Must be iterable of 4 lenght")
+            raise MS_ABC.MSException("Must be iterable of 4 length")
+        if request_type == self.REQUEST_U:
+            send_key, convert_func = self.SEND_U, self._convert_u
+        elif request_type == self.REQUEST_R:
+            send_key, convert_func = self.SEND_R, self._convert_r
+        else:
+            raise MS_ABC.MSException(f"Wrong request_type arg, with value {request_type}")
         sent_bytes = 0
         sent_bytes += self.ser.write(self.BEGIN_KEY)
-        sent_bytes += self.ser.write(self.SEND_U)
+        sent_bytes += self.ser.write(self._form_send_key(send_key, sensor_types_list))
         for number in values:
             sent_bytes += self.ser.write(convert_func(number))
         sent_bytes += self.ser.write(self.END_KEY)
@@ -285,8 +306,10 @@ class MS_Uni():
         self.ms.send_measurement_range(values[:self.sensors_number])
         self.ms.recieve_measurement_range_answer()
 
-    def full_request(self, values):
-        return self.ms.full_request(values[:self.sensors_number], self.ms.REQUEST_U)
+    def full_request(self, values, sensor_types_list = None):
+        if sensor_types_list is None:
+            sensor_types_list = []
+        return self.ms.full_request(values[:self.sensors_number], self.ms.REQUEST_U, sensor_types_list)
 
     def close(self):
         self.ms.close()
