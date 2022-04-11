@@ -156,6 +156,8 @@ class CalibrationWidget(QtWidgets.QWidget):
             self.per_sensor.set_r0s(
                 self.calculate_masked_mean(averaging_massive))
         except MS_ABC.MSException:
+            raise
+        finally:
             self.ms.close()
             self.ms = None
 
