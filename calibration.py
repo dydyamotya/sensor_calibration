@@ -62,7 +62,7 @@ class CalibrationWidget(QtWidgets.QWidget):
         self.setWindowTitle("Calibration")
         self.parent_py = parent
 
-        self.stopped = False
+        self.stopped = True
         self.ms = None
         self.thread = None
         self.last_idx = -1
@@ -174,7 +174,8 @@ class CalibrationWidget(QtWidgets.QWidget):
 
         self.resistances = np.zeros((self.sensor_number, all_steps))
 
-        voltage_row = np.linspace(initial_voltage, end_voltage, num=all_steps)
+        voltage_row = np.linspace(
+            initial_voltage, end_voltage + microstep, num=all_steps)
 
         self.voltages = np.vstack(
             [voltage_row for i in range(self.sensor_number)])
