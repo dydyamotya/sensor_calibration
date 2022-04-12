@@ -1,10 +1,11 @@
 from threading import Thread
 from PySide2 import QtWidgets
 from PySide2.QtGui import QPixmap, QColor
-from PySide2.QtCore import Signal, Slot, Qt
+from PySide2.QtCore import Slot, Qt
 from sensor_system import MS_Uni, MS_ABC
 from misc import TypeCheckLineEdit
 import time
+import configparser
 
 from matplotlib import figure
 from matplotlib.lines import Line2D
@@ -226,13 +227,25 @@ class CalibrationWidget(QtWidgets.QWidget):
         if self.stopped:
             logger.debug("Recalc signal handler")
             if any(self.resistances.flatten() > 0):
-                self.cal_plot_widget.set_lines(*self.get_data())
+                voltages, _, temperatures = self.get_data()
+                self.cal_plot_widget.set_lines(voltages, temperatures)
 
     def get_data(self):
-        voltages = self.voltages[:, :self.last_idx]
-        temperatures = self.per_sensor.process_resistances(
-            self.resistances[:, :self.last_idx])
-        return voltages, temperatures
+        try:
+            voltages = self.voltages[:, :self.last_idx]
+            temperatures = self.per_sensor.process_resistances(
+                self.resistances[:, :self.last_idx])
+            resistances = self.resistances[:, :self.last_idx]
+        except TypeError:
+            voltages, temperatures, resistances = np.array(
+                []), np.array([]), np.array([])
+        finally:
+            return voltages, resistances, temperatures
+
+    def load_data(self, voltages, resistances):
+        self.last_idx = -1
+        self.voltages = voltages
+        self.resistances = resistances
 
     def get_params(self):
         r0s, rns, alphas = [], [], []
@@ -243,6 +256,10 @@ class CalibrationWidget(QtWidgets.QWidget):
             rns.append(rn)
             alphas.append(alpha)
         return r0s, rns, alphas, self.per_sensor.T0_entry.get_value(), vmax
+
+    def load_params(self, config: configparser.ConfigParser):
+        self.per_sensor.T0_entry.set_value(config["T0"]["T0"])
+        self.per_sensor.set_variables(config)
 
 
 class PerSensorSettings(QtWidgets.QWidget):
@@ -273,6 +290,15 @@ class PerSensorSettings(QtWidgets.QWidget):
     def get_variables(self):
         for sensor_widget in self.sensor_widgets:
             yield sensor_widget.get_variables()
+
+    def set_variables(self, config: configparser.ConfigParser):
+        for idx, sensor_widget in enumerate(self.sensor_widgets):
+            sensor_widget.r0.set_value(
+                float(config["R0"][f"R0_{idx:d}"].replace(",", ".")) / 100)
+            sensor_widget.rn.set_value(
+                float(config["Rc"][f"Rc_{idx:d}"].replace(",", ".")) / 100)
+            sensor_widget.alpha.set_value(
+                float(config["a"][f"a0_{idx:d}"].replace(",", ".")))
 
     def process_resistances(self, resistances: np.ndarray) -> np.ndarray:
         T0 = self.T0_entry.get_value()
@@ -421,7 +447,7 @@ class SaveButtons(QtWidgets.QWidget):
     def __init__(self, parent):
         super().__init__(parent)
 
-        self.parent_py = parent
+        self.parent_py: CalibrationWidget = parent
 
         layout = QtWidgets.QHBoxLayout(self)
 
@@ -429,18 +455,30 @@ class SaveButtons(QtWidgets.QWidget):
             "Save calibration", self)
         self.save_parameters_button = QtWidgets.QPushButton(
             "Save parameters", self)
+        self.load_parameters_button = QtWidgets.QPushButton(
+            "Load parameters", self)
+        self.save_resistances_button = QtWidgets.QPushButton(
+            "Save resistances", self)
+        self.load_resistances_button = QtWidgets.QPushButton(
+            "Load resistances", self)
 
         self.save_calibration_button.clicked.connect(self.save_calibration)
         self.save_parameters_button.clicked.connect(self.save_parameters)
+        self.load_parameters_button.clicked.connect(self.load_parameters)
+        self.save_resistances_button.clicked.connect(self.save_resistances)
+        self.load_resistances_button.clicked.connect(self.load_resistances)
 
         layout.addWidget(self.save_calibration_button)
         layout.addWidget(self.save_parameters_button)
+        layout.addWidget(self.load_parameters_button)
+        layout.addWidget(self.save_resistances_button)
+        layout.addWidget(self.load_resistances_button)
 
     def save_calibration(self):
         filename, filters = QtWidgets.QFileDialog.getSaveFileName(
             self, "Save Calibration", "./tests", "Calibration File (*.cal)")
         if filename:
-            voltages, temperatures = self.parent_py.get_data()
+            voltages, _, temperatures = self.parent_py.get_data()
             items = voltages.shape[1]
             with open(filename, "w") as fd:
                 fd.write(f"Items {items:d}\n")
@@ -456,30 +494,51 @@ class SaveButtons(QtWidgets.QWidget):
     def save_parameters(self):
         filename, filters = QtWidgets.QFileDialog.getSaveFileName(
             self, "Save Parameters", "./tests", "Parameters File (*.par)")
-        if filename:
-            r0s, rns, alphas, t0, Vmax = self.parent_py.get_params()
-            with open(filename, "w") as fd:
-                fd.write("[R0]\n")
-                for idx, r0 in enumerate(r0s):
-                    to_file = "R0_{:d}={:f}\n".format(
-                        idx, r0*100).replace(".", ",")
-                    fd.write(to_file)
-                fd.write("[Rc]\n")
-                for idx, rn in enumerate(rns):
-                    to_file = "Rc_{:d}={:f}\n".format(
-                        idx, rn*100).replace(".", ",")
-                    fd.write(to_file)
-                fd.write("[a]\n")
-                for idx, alpha in enumerate(alphas):
-                    to_file = "a0_{:d}={:f}\n".format(
-                        idx, alpha).replace(".", ",")
-                    fd.write(to_file)
-                fd.write("[T0]\n")
-                to_file = "T0={:f}\n".format(t0).replace(".", ",")
-                fd.write(to_file)
-                fd.write("[Vmax]\n")
-                to_file = "Vmax={:f}\n".format(Vmax).replace(".", ",")
-                fd.write(to_file)
+        if not filename:
+            return
+
+        config = configparser.ConfigParser()
+        r0s, rns, alphas, t0, Vmax = self.parent_py.get_params()
+
+        config["R0"] = {f"R0_{idx:d}": "{:f}".format(
+            r0*100).replace(".", ",") for idx, r0 in enumerate(r0s)}
+        config["Rc"] = {f"Rc_{idx:d}": "{:f}".format(
+            rn*100).replace(".", ",") for idx, rn in enumerate(rns)}
+        config["a"] = {f"a0_{idx:d}": "{:f}".format(rn).replace(
+            ".", ",") for idx, rn in enumerate(alphas)}
+        config["T0"] = dict(T0="{:f}".format(t0).replace(".", ","))
+        config["Vmax"] = dict(Vmax="{:f}".format(Vmax).replace(".", ","))
+
+        with open(filename, "w") as fd:
+            config.write(fd)
+
+    def load_parameters(self):
+        filename, filters = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Save Parameters", "./tests", "Parameters File (*.par)")
+        if not filename:
+            return
+        config = configparser.ConfigParser()
+
+        config.read(filename)
+
+        self.parent_py.load_params(config)
+
+    def save_resistances(self):
+        filename, filters = QtWidgets.QFileDialog.getSaveFileName(
+            self, "Save Resistances", "./tests", "Resistances File (*.npz)")
+        if not filename:
+            return
+        voltages, resistances, _ = self.parent_py.get_data()
+        np.savez(filename, voltages=voltages, resistances=resistances)
+
+    def load_resistances(self):
+        filename, filters = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Load Resistances", "./tests", "Resistances File (*.npz)")
+        if not filename:
+            return
+        npzfile = np.load(filename)
+        voltages, resistances = npzfile["voltages"], npzfile["resistances"]
+        self.parent_py.load_data(voltages, resistances)
 
 
 class CssCheckBoxes(QtWidgets.QWidget):
