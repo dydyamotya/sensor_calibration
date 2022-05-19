@@ -290,10 +290,13 @@ class MS_Uni():
         self.ms.send_measurement_range(values[:self.sensors_number])
         self.ms.recieve_measurement_range_answer()
 
-    def full_request(self, values, sensor_types_list = None):
+    def full_request(self, values, request_type = MS_ABC.REQUEST_U, sensor_types_list = None):
         if sensor_types_list is None:
             sensor_types_list = []
-        return self.ms.full_request(values[:self.sensors_number], self.ms.REQUEST_U, sensor_types_list)
+        return self.ms.full_request(values[:self.sensors_number], request_type, sensor_types_list)
+
+    def clear_state(self):
+        self.full_request([0,] * self.ms.sensors_number)
 
     def close(self):
         self.ms.close()

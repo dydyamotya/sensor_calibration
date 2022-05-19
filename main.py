@@ -1,290 +1,105 @@
-import numpy as np
-from scipy.optimize import curve_fit
-from serial.tools.list_ports import comports
-import sys
-import platform
-from sensor_system import MS12, MS4, MS_Uni
-from calibration import CalibrationProxyFrame
-
-from PySide2 import QtWidgets, QtCore, QtGui
-from pyside_constructor_widgets.widgets import ComPortWidget
-import logging
-import matplotlib as mpl
-from matplotlib import figure
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
+from PySide2 import QtWidgets, QtCore
 import argparse
+import logging
+from u_calibration import UCalibrationWidget
+from calibration import CalibrationWidget
+from measurement import MeasurementWidget
+from operation import OperationWidget
+import sys
+from pyside_constructor_widgets.widgets import comports_list
+from database_widgets import DatabaseLeaderComboboxWidget, DatabaseNonleaderComboboxWidget
+from sensor_system import MS_Uni, MS_ABC
+import socket
+
+from models import Machine
+
 logger = logging.getLogger(__name__)
-
-from collections import UserDict
-
-class ResistanseDict(UserDict):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def __getitem__(self, key):
-        if key in self.data:
-            return self.data[key]
-        else:
-            try:
-                return float(key)
-            except ValueError:
-                raise
-
-
-rs = np.array([5e8, 1e8, 1e7, 1e6, 1e5, 5.1e4, 1e4, 1e3])
-r4_str_values = ["100 kOhm", "1.1 MOhm", "11.1 MOhm"]
-r4_combobox_dict = ResistanseDict(zip(r4_str_values, (1e5, 1.1e6, 1.11e7)))
-r4_range_dict = dict(zip(r4_str_values, (1, 2, 3)))
-
-r_labels_str = tuple(map("{:1.2e}".format, rs))
-
-
-
-def get_float(x):
-    try:
-        return float(x)
-    except:
-        return 0
-
-
-
-class MainWidget(QtWidgets.QWidget):
-    def __init__(self, debug_level, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.debug_level = debug_level
-        self._init_ui()
-
-    def _init_ui(self):
-        layout = QtWidgets.QVBoxLayout()
-        self.setLayout(layout)
-
-        self.settings_widget = EquipmentSettings()
-        layout.addWidget(self.settings_widget)
-
-        self.calibration_proxy_frame = CalibrationProxyFrame(self)
-        layout.addWidget(self.calibration_proxy_frame)
-
-        hbox_layout = QtWidgets.QHBoxLayout()
-        layout.addLayout(hbox_layout)
-        for _ in range(3):
-            hbox_layout.addWidget(OneSensorFrame(self, self.settings_widget, self.debug_level))
-
-
-class PlusWidget(QtWidgets.QWidget):
-    def __init__(self):
-        super().__init__()
-        self.label = QtWidgets.QPushButton(icon=QtGui.QIcon("icons/plus.png"))
-        self.label.setMinimumSize(20, 20)
-        self.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
-                           QtWidgets.QSizePolicy.Expanding)
-        layout = QtWidgets.QVBoxLayout()
-        layout.addWidget(self.label)
-        layout.setAlignment(self.label, QtCore.Qt.AlignCenter)
-        self.setLayout(layout)
-
-
-class OneSensorFrame(QtWidgets.QWidget):
-    def __init__(self, master, settings, debug_level, *args, **kwargs):
-        super(OneSensorFrame, self).__init__(master, *args, **kwargs)
-        self.settings = settings
-        self.debug_level = debug_level
-        self.labels = []
-
-        layout = QtWidgets.QGridLayout()
-        layout.setColumnStretch(0, 0)
-        layout.setColumnStretch(1, 1)
-        layout.setColumnStretch(2, 0)
-        self.setLayout(layout)
-
-        row = 0
-
-        r4_widget = QtWidgets.QComboBox()
-        r4_widget.addItems(tuple(r4_combobox_dict.keys()))
-        r4_widget.setEditable(True)
-        layout.addWidget(r4_widget, row, 1)
-        layout.addWidget(QtWidgets.QLabel("R4: "), row, 0)
-        row += 1
-
-        sensor_widget = QtWidgets.QComboBox()
-        sensor_widget.addItems(tuple(map(str, range(1, 13))))
-        sensor_widget.setEditable(False)
-        layout.addWidget(sensor_widget, row, 1)
-        layout.addWidget(QtWidgets.QLabel("Sensor #: "), row, 0)
-        row += 1
-
-        self.entries = dict(
-            zip(r_labels_str, (QtWidgets.QLineEdit(self) for i in range(len(r_labels_str)))))
-
-        def get_func(index):
-            def measure_u():
-                com_port, sensor_number, _ = self.settings.get_variables()
-                logger.debug(
-                    f"{com_port}, {r4_widget.currentText()}, {sensor_widget.currentText()}")
-                ms = MS_Uni(sensor_number=sensor_number, port=com_port)
-                try:
-                    if r4_widget.currentText() in r4_str_values:
-                        ms.send_measurement_range(
-                            (r4_range_dict[r4_widget.currentText()],) * 12)
-                    else:
-                        pass
-
-                    answers = [ms.full_request((0,) * 12)[0] for _ in range(15)]
-                    try:
-                        self.entries[r_labels_str[index]].setText("{:2.5f}".format(
-                            sum([answer[int(sensor_widget.currentText()) - 1] for answer in answers[5:]])/10))
-                    except IndexError:
-                        print("No sensor there")
-                except:
-                    ms.close()
-
-
-            return measure_u
-
-        buttons = dict(zip(r_labels_str,
-                           (QtWidgets.QPushButton(icon=QtGui.QIcon("icons/load.png")) for i in
-                            range(len(r_labels_str)))))
-
-        for idx, (label, entry, button) in enumerate(zip(r_labels_str, self.entries.values(), buttons.values())):
-            button.clicked.connect(get_func(idx))
-            button.setSizePolicy(QtWidgets.QSizePolicy.Minimum,
-                                 QtWidgets.QSizePolicy.Expanding)
-            label_widget = QtWidgets.QLabel(label)
-            self.labels.append(label_widget)
-            layout.addWidget(label_widget, row, 0)
-            layout.addWidget(entry, row, 1)
-            layout.addWidget(button, row, 2)
-            row += 1
-
-        result_widget_1 = QtWidgets.QLineEdit()
-        result_widget_2 = QtWidgets.QLineEdit()
-        result_widget_1.setReadOnly(True)
-        result_widget_2.setReadOnly(True)
-
-        slice_widget_1 = QtWidgets.QLineEdit(text="0")
-        slice_widget_1.setValidator(QtGui.QIntValidator(0, 8))
-        slice_widget_2 = QtWidgets.QLineEdit(text="8")
-        slice_widget_2.setValidator(QtGui.QIntValidator(0, 8))
-
-        rs1_widget = QtWidgets.QLineEdit(text="3.2")
-        rs2_widget = QtWidgets.QLineEdit(text="1.6")
-        if platform.system() == "Linux":
-            rs1_widget.setValidator(QtGui.QDoubleValidator())
-            rs2_widget.setValidator(QtGui.QDoubleValidator())
-
-        def click_calc_button():
-            k = 4.068
-            r4 = r4_combobox_dict[r4_widget.currentText()]
-
-            def f(u, rs1, rs2):
-                return (rs1 - rs2) * r4 / ((2.5 + 2.5 * k - u) / k - rs2) - r4
-
-            def f_logd(u, rs1, rs2):
-                return np.log10((rs1 - rs2) * r4 / ((2.5 + 2.5 * k - u) / k - rs2) - r4)
-
-            try:
-                left_slice = int(slice_widget_1.text())
-                right_slice = int(slice_widget_2.text())
-                rs1 = float(rs1_widget.text())
-                rs2 = float(rs2_widget.text())
-            except ValueError:
-                logger.error("You should enter some values in these fields")
-                return None
-            else:
-                x = tuple(self.entries[i].text() for i in r_labels_str)
-                x = tuple(map(get_float, x))
-                y = rs
-                x, y = x[left_slice:right_slice], y[left_slice:right_slice]
-                #popt, _ = curve_fit(f, x, y, p0=(rs1, rs2), bounds = ((2.9, 1.8), (3.2, 2.1)), method="dogbox")
-                popt, _ = curve_fit(f_logd, x, np.log10(y), p0=(rs1, rs2))
-                *_, separator = self.settings.get_variables()
-                result_widget_1.setText("{:2.6f}".format(popt[0]).replace(".", "," if separator else "."))
-                result_widget_2.setText("{:2.6f}".format(popt[1]).replace(".", "," if separator else "."))
-
-                PlotWidget(self, x, y, f, popt)
-
-        calc_button = QtWidgets.QPushButton(text="Calc coeffs")
-        calc_button.clicked.connect(click_calc_button)
-
-
-        layout.addWidget(slice_widget_1, row, 0)
-        layout.addWidget(slice_widget_2, row, 1)
-        row += 1
-
-        layout.addWidget(rs1_widget, row, 0)
-        layout.addWidget(rs2_widget, row, 1)
-        row += 1
-
-        layout.addWidget(calc_button, row, 0)
-        layout.addWidget(result_widget_1, row, 1)
-        row += 1
-
-        if self.debug_level == logging.DEBUG:
-            test_button = QtWidgets.QPushButton(text="Test values")
-            test_button.clicked.connect(self.fill_with_test_data)
-            layout.addWidget(test_button, row, 0)
-
-        layout.addWidget(result_widget_2, row, 1)
-
-    def fill_with_test_data(self):
-        test_values = ["4.61042", "4.57307", "4.20415", "2.41583", "0.75001", "0.58466", "0.43554", "0.40117"]
-        for widget, text in zip(self.entries.values(), test_values):
-            widget.setText(text)
-
 
 
 class EquipmentSettings(QtWidgets.QWidget):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, *kwargs)
-        layout = QtWidgets.QVBoxLayout()
+    redraw_signal = QtCore.Signal(int)
+
+    def __init__(self, global_settings, *args, **kwargs):
+        super().__init__(*args, f=QtCore.Qt.Tool, **kwargs)
+        layout = QtWidgets.QFormLayout()
         self.setLayout(layout)
+        self.setWindowTitle("Settings")
+        self.global_settings = global_settings
 
-        self.comport_widget = ComPortWidget()
-        layout.addWidget(self.comport_widget)
+        self.machine_name_widget = DatabaseLeaderComboboxWidget(Machine, "name")
+        layout.addRow("Machine name:", self.machine_name_widget)
 
-        self.sensor_number_widget = QtWidgets.QComboBox()
-        layout.addWidget(self.sensor_number_widget)
+        self.comport_widget = DatabaseNonleaderComboboxWidget(self.machine_name_widget, "last_port", comports_list(),
+                                                              comports_list())
+        layout.addRow("Port:", self.comport_widget)
 
-        self.separator_checkbox = QtWidgets.QCheckBox()
-        layout.addWidget(self.separator_checkbox)
+        self.sensor_number_widget = DatabaseNonleaderComboboxWidget(self.machine_name_widget, "sensors_number",
+                                                                    ["4", "12"], [4, 12])
+        layout.addRow("Sensor number:", self.sensor_number_widget)
 
-        self.sensor_number_widget.addItems(("4", "12"))
-        self.sensor_number_widget.setCurrentText("12")
+        self.multirange_widget = DatabaseNonleaderComboboxWidget(self.machine_name_widget, "multirange", ["yes", "no"],
+                                                                 [1, 0])
+        layout.addRow("Multirange:", self.multirange_widget)
+
+        self.machine_name_widget.currentTextChanged.connect(self.comport_widget.on_leader_value_change)
+        self.machine_name_widget.currentTextChanged.connect(self.sensor_number_widget.on_leader_value_change)
+        self.machine_name_widget.currentTextChanged.connect(self.multirange_widget.on_leader_value_change)
+
+        self.machine_name_widget.activated.connect(self.redraw_signal.emit)
+        self.multirange_widget.activated.connect(self.redraw_signal.emit)
+        self.sensor_number_widget.activated.connect(self.redraw_signal.emit)
+        self.comport_widget.activated.connect(self.redraw_signal.emit)
+
+        self.machine_name_widget.setCurrentIndex(0)
+        self.machine_name_widget.currentTextChanged.emit(self.machine_name_widget.currentText())
 
     def get_variables(self):
-        return self.comport_widget.text(), int(self.sensor_number_widget.currentText()), self.separator_checkbox.isChecked()
+        return self.comport_widget.get_value(), self.sensor_number_widget.get_value(), self.multirange_widget.get_value(), self.machine_name_widget.get_value()
 
+    def get_new_ms(self):
+        return MS_Uni(self.sensor_number_widget.get_value(), self.comport_widget.get_value())
 
-class PlotWidget(QtWidgets.QWidget):
-    def __init__(self, parent, x, y, f, popt):
-        super().__init__(parent, f=QtCore.Qt.Tool)
-        fig = figure.Figure()
-        ax = fig.add_subplot(2, 1, 1)
-        ax2 = fig.add_subplot(2, 1, 2, sharex=ax)
-        canvas = FigureCanvasQTAgg(figure=fig)
-        layout = QtWidgets.QVBoxLayout()
+    def toggle_visibility(self):
+        self.setVisible(not self.isVisible())
+        if self.isVisible():
+            self.comport_widget.refresh_values(comports_list(), comports_list())
+
+class GasStateWidget(QtWidgets.QWidget):
+    redraw_signal = QtCore.Signal(int)
+
+    def __init__(self, global_settings, *args, **kwargs):
+        super().__init__(*args, f=QtCore.Qt.Tool, **kwargs)
+        layout = QtWidgets.QFormLayout()
         self.setLayout(layout)
-        layout.addWidget(canvas)
-        toolbox = NavigationToolbar2QT(canvas, self)
-        layout.addWidget(toolbox)
-        ax.set_yscale("log")
-        ax.set_xlabel("Voltage, V")
-        ax.set_ylabel("log(R)")
-        self.setWindowTitle("Visualization of regression")
-        ax.scatter(x, y)
-        linspace = np.linspace(0, 5, num=10000)
-        ax.plot(linspace, f(linspace, *popt))
-        ax2.plot(x, np.abs((y - f(np.array(x), *popt))/y), marker=".")
-        fig.tight_layout()
-        canvas.draw()
-        self.show()
+        self.setWindowTitle("Settings")
+        self.global_settings = global_settings
 
-    def keyReleaseEvent(self, event):
-        if event.key() == QtCore.Qt.Key_Escape:
-            self.close()
+        self.gas_state_server_address = QtWidgets.QLineEdit()
+        layout.addRow("GasState Server IP:", self.gas_state_server_address)
+
+        self.gas_state_test = QtWidgets.QLineEdit()
+        layout.addRow("Test state:", self.gas_state_test)
+
+        self.gas_state_test.returnPressed.connect(self.send_state_test)
+
+    def send_state(self, state_num: int):
+        logger.debug(str(state_num))
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        ip, port = self.gas_state_server_address.text().split(":")
+        s.connect((ip, int(port)))
+        s.send(str(state_num).encode("utf-8"))
+        s.close()
+
+    def send_state_test(self):
+        self.send_state(self.gas_state_test.text())
+
+    def toggle_visibility(self):
+        self.setVisible(not self.isVisible())
 
 
 def main():
     app = QtWidgets.QApplication()
+    settings = QtCore.QSettings("MotyaSoft", "SensorinGas Beta")
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", action="store_true")
@@ -293,9 +108,39 @@ def main():
     level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(level=level)
 
-    window = MainWidget(level)
-    window.setWindowTitle("Sensor calibrator")
-    window.show()
+    main_window = QtWidgets.QMainWindow()
+    main_window.setWindowTitle("SensorinGas Beta")
+
+    menu_bar = main_window.menuBar()
+
+    main_window.settings_widget = EquipmentSettings(settings)
+    logger.debug("After equipment setting init")
+    action = QtWidgets.QAction("Settings", main_window)
+    action.triggered.connect(main_window.settings_widget.toggle_visibility)
+    menu_bar.addAction(action)
+
+    main_window.gasstate_widget = GasStateWidget(settings)
+    logger.debug("After gasstate init")
+    action = QtWidgets.QAction("GasState Server", main_window)
+    action.triggered.connect(main_window.gasstate_widget.toggle_visibility)
+    menu_bar.addAction(action)
+
+    central_widget = QtWidgets.QTabWidget()
+    main_window.setCentralWidget(central_widget)
+
+    window = MeasurementWidget(main_window, level, settings)
+    central_widget.addTab(window, "Measurement")
+
+    window = OperationWidget(main_window, level, settings, window)
+    central_widget.addTab(window, "Operation")
+
+    window = CalibrationWidget(main_window, level, settings)
+    central_widget.addTab(window, "Heater calibration")
+
+    window = UCalibrationWidget(main_window, level, settings)
+    central_widget.addTab(window, "Sensor calibration")
+
+    main_window.show()
 
     sys.exit(app.exec_())
 

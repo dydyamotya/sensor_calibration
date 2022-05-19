@@ -19,6 +19,9 @@ else:
         def text(self):
             return self.currentText()
 
+    def comports_list():
+        return [x.device for x in comports()]
+
 class TestWidget():
     pass
 
