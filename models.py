@@ -1,11 +1,17 @@
-from peewee import *
+from peewee import Model, IntegerField, TextField, BooleanField, SqliteDatabase
+from peewee import fn, FloatField, DateTimeField, ForeignKeyField
 from datetime import datetime
 
-db = SqliteDatabase("sensoringas.db")
+db = SqliteDatabase("sensoringas.db", pragmas={'foreign_keys': 1})
+
+fn = fn
+
 
 class BaseModel(Model):
+
     class Meta:
         database = db
+
 
 class Machine(BaseModel):
     id = IntegerField(primary_key=True)
@@ -14,8 +20,8 @@ class Machine(BaseModel):
     sensors_number = IntegerField(default=12)
     multirange = BooleanField(default=True)
 
+
 class SensorPosition(BaseModel):
-    machine_name = ForeignKeyField(Machine.name, backref="sensor_positions")
     sensor_num = IntegerField()
     r4 = FloatField()
     rs_u1 = FloatField()
@@ -24,6 +30,8 @@ class SensorPosition(BaseModel):
     x = TextField()
     y = TextField()
     datetime = DateTimeField(default=datetime.now)
+    machine = ForeignKeyField(Machine, backref="sensors")
+
 
 db.connect()
 db.create_tables((Machine, SensorPosition))

@@ -1,3 +1,5 @@
+import datetime
+
 from yaml import load, dump
 from collections import UserDict
 import numpy as np
@@ -10,6 +12,7 @@ import logging
 from matplotlib import figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 from models import SensorPosition
+
 logger = logging.getLogger(__name__)
 
 
@@ -111,10 +114,7 @@ class OneSensorFrame(QtWidgets.QWidget):
 
         def get_func(index):
             def measure_u():
-                com_port, sensor_number, *_ = self.settings_widget.get_variables()
-                logger.debug(
-                    f"{com_port}, {r4_widget.currentText()}, {sensor_widget.currentText()}")
-                ms = MS_Uni(sensor_number=sensor_number, port=com_port)
+                ms = self.settings_widget.get_new_ms()
                 try:
                     if r4_widget.currentText() in r4_str_values:
                         ms.send_measurement_range(
@@ -126,7 +126,7 @@ class OneSensorFrame(QtWidgets.QWidget):
                                for _ in range(15)]
                     try:
                         self.entries[r_labels_str[index]].setText("{:2.5f}".format(
-                            sum([answer[int(sensor_widget.currentText()) - 1] for answer in answers[5:]])/10))
+                            sum([answer[int(sensor_widget.currentText()) - 1] for answer in answers[5:]]) / 10))
                     except IndexError:
                         print("No sensor there")
                 except:
@@ -267,7 +267,7 @@ class PlotWidget(QtWidgets.QWidget):
         ax.scatter(x, y)
         linspace = np.linspace(0, 5, num=10000)
         ax.plot(linspace, func(linspace, *popt))
-        ax2.plot(x, np.abs((y - func(np.array(x), *popt))/y), marker=".")
+        ax2.plot(x, np.abs((y - func(np.array(x), *popt)) / y), marker=".")
         fig.tight_layout()
         canvas.draw()
         self.show()
@@ -277,15 +277,15 @@ class PlotWidget(QtWidgets.QWidget):
             self.close()
 
     def on_accept(self):
-        comport, sensor_number, multirange, machine_name = self.settings_widget.get_variables()
-        SensorPosition.create(machine_name=machine_name,
-                              sensor_num = self.sensor_num,
-                            r4 = self.r4,
-                              rs_u1 = self.popt[0],
-                              rs_u2 = self.popt[1],
-                              k = 4.068,
-                              x = self.x,
-                              y = self.y)
+        comport, sensor_number, multirange, machine_name, machine_id = self.settings_widget.get_variables()
+        SensorPosition.create(machine=machine_id,
+                              sensor_num=self.sensor_num,
+                              r4=self.r4,
+                              rs_u1=self.popt[0],
+                              rs_u2=self.popt[1],
+                              k=4.068,
+                              x=self.x,
+                              y=self.y)
         self.save_to_file()
 
     def save_to_file(self):
@@ -309,4 +309,3 @@ class PlotWidget(QtWidgets.QWidget):
         self.global_settings.setValue(f"ku_{sensor_num}", 4.068)
         self.global_settings.endGroup()
         self.close()
-

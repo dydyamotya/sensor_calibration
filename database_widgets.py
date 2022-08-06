@@ -38,6 +38,9 @@ class DatabaseLeaderComboboxWidget(QtWidgets.QComboBox):
     def get_value(self):
         return self.currentText()
 
+    def get_id(self):
+        return getattr(self.model.get(getattr(self.model, self.key) == self.currentText()), "id")
+
 
 class DatabaseNonleaderComboboxWidget(QtWidgets.QComboBox):
     def __init__(self, leader_widget: DatabaseLeaderComboboxWidget, key: str, keys: typing.Sequence, values: typing.Sequence,  *args, **kwargs):

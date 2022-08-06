@@ -54,7 +54,11 @@ class EquipmentSettings(QtWidgets.QWidget):
         self.machine_name_widget.currentTextChanged.emit(self.machine_name_widget.currentText())
 
     def get_variables(self):
-        return self.comport_widget.get_value(), self.sensor_number_widget.get_value(), self.multirange_widget.get_value(), self.machine_name_widget.get_value()
+        return (self.comport_widget.get_value(),
+                self.sensor_number_widget.get_value(),
+                self.multirange_widget.get_value(),
+                self.machine_name_widget.get_value(),
+                self.machine_name_widget.get_id())
 
     def get_new_ms(self):
         return MS_Uni(self.sensor_number_widget.get_value(), self.comport_widget.get_value())
@@ -63,6 +67,7 @@ class EquipmentSettings(QtWidgets.QWidget):
         self.setVisible(not self.isVisible())
         if self.isVisible():
             self.comport_widget.refresh_values(comports_list(), comports_list())
+
 
 class GasStateWidget(QtWidgets.QWidget):
     redraw_signal = QtCore.Signal(int)
@@ -83,7 +88,6 @@ class GasStateWidget(QtWidgets.QWidget):
         self.gas_state_test.returnPressed.connect(self.send_state_test)
 
     def send_state(self, state_num: int):
-        logger.debug(str(state_num))
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         ip, port = self.gas_state_server_address.text().split(":")
         s.connect((ip, int(port)))
@@ -106,7 +110,7 @@ def main():
 
     args = parser.parse_args()
     level = logging.DEBUG if args.debug else logging.INFO
-    logging.basicConfig(level=level)
+    logging.basicConfig(level=level, format='%(asctime)s:%(module)s:%(levelname)s:%(message)s')
 
     main_window = QtWidgets.QMainWindow()
     main_window.setWindowTitle("SensorinGas Beta")

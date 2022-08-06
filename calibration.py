@@ -142,7 +142,7 @@ class CalibrationWidget(QtWidgets.QWidget):
     @Slot()
     def get_r0(self):
         try:
-            self.ms = MS_Uni(self.sensor_number, self.comport)
+            self.ms = self.parent_py.settings_widget.get_new_ms()
             r0_voltage = self.r0_voltage.get_value()
             steps_per_measurement = 10
             averaging_massive = self.get_average_massive(
@@ -161,7 +161,7 @@ class CalibrationWidget(QtWidgets.QWidget):
         if self.ms:
             return
 
-        self.ms = MS_Uni(self.sensor_number, self.comport)
+        self.ms = self.parent_py.settings_widget.get_new_ms()
 
         (
             initial_voltage,
@@ -210,6 +210,8 @@ class CalibrationWidget(QtWidgets.QWidget):
                 self.ms.close()
                 self.ms = None
                 return
+            except KeyboardInterrupt:
+                break
         self.full_request_until_result((0,) * self.sensor_number)
         self.stopped = True
         self.last_idx = -1
@@ -226,15 +228,17 @@ class CalibrationWidget(QtWidgets.QWidget):
         ]
 
         logger.debug(f"{sensor_types_list}")
+        exceptions_save = None
         for i in range(20):
             try:
-                us, rs = self.ms.full_request(values, sensor_types_list)
-            except MS_ABC.MSException:
+                us, rs = self.ms.full_request(values, sensor_types_list=sensor_types_list)
+            except MS_ABC.MSException as e:
+                exceptions_save = e
                 logger.debug(f"Full request try: {i}")
             else:
                 return us, rs
         else:
-            raise MS_ABC.MSException("Failed to obtain result somehow")
+            raise exceptions_save
 
     def recalc_signal_handler(self):
         if self.stopped:

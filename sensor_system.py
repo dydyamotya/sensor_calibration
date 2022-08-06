@@ -85,13 +85,14 @@ class MS_ABC(ABC):
             recieved += self.ser.read(1)
         return recieved
 
-    def full_request(self, values: typing.Iterable, request_type, sensor_types_list: typing.Sequence):
+    def full_request(self, values: typing.Collection, request_type, sensor_types_list: typing.Sequence):
         """:returns us, rs
         us - voltage, measured on sensors,
         rs - resistance of heaters"""
         logger.debug("Full request in")
         logger.debug(f"Sending values, {values}")
         self._send(values, request_type, sensor_types_list)
+        logger.debug(f"recieving values")
         return self.recieve_answer()
 
     def recieve_answer(self) -> typing.Tuple[np.ndarray, np.ndarray]:
@@ -193,14 +194,9 @@ class MS12(MS_ABC):
             send_key, convert_func = self.SEND_R, self._convert_r
         else:
             raise MS_ABC.MSException(f"Wrong request_type arg, with value {request_type}")
-        sent_bytes = 0
-        sent_bytes += self.ser.write(self.BEGIN_KEY)
-        sent_bytes += self.ser.write(self._form_send_key(send_key, sensor_types_list))
-        for number in values:
-            sent_bytes += self.ser.write(convert_func(number))
-        sent_bytes += self.ser.write(bytes(8))  # protocol issue
-        sent_bytes += self.ser.write(self.END_KEY)
-        return sent_bytes
+        send_key = self._form_send_key(send_key, sensor_types_list)
+        message = self.BEGIN_KEY + send_key + functools.reduce(operator.add, (convert_func(number) for number in values)) + bytes(8) + self.END_KEY
+        return self.ser.write(message)
 
     def _send_test(self):
         send_message = self.BEGIN_KEY + self.SEND_U + bytes(16 * 2) + self.END_KEY
@@ -231,13 +227,9 @@ class MS4(MS_ABC):
             send_key, convert_func = self.SEND_R, self._convert_r
         else:
             raise MS_ABC.MSException(f"Wrong request_type arg, with value {request_type}")
-        sent_bytes = 0
-        sent_bytes += self.ser.write(self.BEGIN_KEY)
-        sent_bytes += self.ser.write(self._form_send_key(send_key, sensor_types_list))
-        for number in values:
-            sent_bytes += self.ser.write(convert_func(number))
-        sent_bytes += self.ser.write(self.END_KEY)
-        return sent_bytes
+        send_key = self._form_send_key(send_key, sensor_types_list)
+        message = self.BEGIN_KEY + send_key + functools.reduce(operator.add, (convert_func(number) for number in values)) + self.END_KEY
+        return self.ser.write(message)
 
     def _send_test(self, *args, **kwargs):
         send_message = self.BEGIN_KEY + self.SEND_U + bytes(4 * 2) + self.END_KEY
