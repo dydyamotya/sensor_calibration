@@ -50,7 +50,13 @@ class EquipmentSettings(QtWidgets.QWidget):
         self.sensor_number_widget.activated.connect(self.redraw_signal.emit)
         self.comport_widget.activated.connect(self.redraw_signal.emit)
 
-        self.machine_name_widget.setCurrentIndex(0)
+        self.redraw_signal.connect(self.save_settings)
+
+        last_model_name = self.global_settings.value("lastmodel")
+        try:
+            self.machine_name_widget.set_new_value(last_model_name)
+        except:
+            self.machine_name_widget.setCurrentIndex(0)
         self.machine_name_widget.currentTextChanged.emit(self.machine_name_widget.currentText())
 
     def get_variables(self):
@@ -62,6 +68,10 @@ class EquipmentSettings(QtWidgets.QWidget):
 
     def get_new_ms(self):
         return MS_Uni(self.sensor_number_widget.get_value(), self.comport_widget.get_value())
+
+    def save_settings(self):
+        self.global_settings.setValue("lastmodel", self.machine_name_widget.currentText())
+
 
     def toggle_visibility(self):
         self.setVisible(not self.isVisible())

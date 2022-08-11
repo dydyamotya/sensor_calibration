@@ -1,9 +1,11 @@
 import datetime
 
 from PySide2 import QtWidgets
-from PySide2.QtCore import Signal, QTimer
+from PySide2.QtCore import Signal, QTimer, Qt
+from PySide2.QtGui import QPixmap, QColor
+from PySide2.QtWidgets import QFrame, QSizePolicy
 
-from misc import clear_layout
+from misc import clear_layout, ClickableLabel, Lamp
 from sensor_system import MS_Uni, MS_ABC
 import pathlib
 import yaml
@@ -14,39 +16,103 @@ import numpy as np
 import threading
 import pyqtgraph as pg
 from queue import Queue
+import csv
+
 
 logger = logging.getLogger(__name__)
 
-colors_for_lines = ["#BBCCEE", "#CCEEFF", "#CCDDAA", "#EEEEBB", "#FFCCCC", "#DDDDDD", "#222255", "#225555", "#225522", "#666633", "#663333", "#555555"]
+colors_for_lines = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22',
+                    '#17becf', "#DDDDDD", "#00FF00"]
+
 
 class QueueRunner():
-    def __init__(self, queue: Queue, hold_method, converters_func_voltage_to_r):
-        self.queue= queue
+    def __init__(self, queue: Queue, converters_func_voltage_to_r):
+        self.queue = queue
         self.thread = None
-        self.hold_method = hold_method
+        self.hold_method = None
         self.stopped = True
         self.filename = None
         self.converter_funcs_dicts = converters_func_voltage_to_r
+        self._meas_values_tuple = None
+        self.meas_tuple_lock = threading.Lock()
+
+    def set_hold(self, hold_method):
+        self.hold_method = hold_method
+
+    def drop_hold_method(self):
+        self.hold_method = None
+
+    def get_meas_tuple(self):
+        with self.meas_tuple_lock:
+            return self._meas_values_tuple
+
+    def set_meas_tuple(self, values):
+        with self.meas_tuple_lock:
+            self._meas_values_tuple = values
 
     def start(self):
-        self.stopped = False
-        self.thread = threading.Thread(target=self.cycle)
-        self.thread.daemon = True
-        self.filename = (pathlib.Path("./tests") / datetime.datetime.now().strftime("%Y%m%d-%H:%M:%S")).with_suffix(".txt")
-        self.thread.start()
+        if self.hold_method is not None and self.stopped:
+            self.stopped = False
+            self.thread = threading.Thread(target=self.cycle)
+            self.filename = (pathlib.Path("./tests") / datetime.datetime.now().strftime("%Y%m%d-%H:%M:%S")).with_suffix(
+                ".txt")
+            self.thread.start()
 
     def cycle(self):
-        fd = self.filename.open("w")
+        fd = self.filename.open("w", newline="")
+        csvwriter = csv.writer(fd, delimiter="\t")
+        headed = False
+        def form_header(sensor_number):
+            header_comment = ("Time,s", *(f"U{idx},V" for idx in range(sensor_number)),
+                      *(f"Rn{idx},Ohm" for idx in range(sensor_number)),
+                      *(f"Rs{idx},Ohm" for idx in range(sensor_number)),
+                      *(f"T{idx},C" for idx in range(sensor_number)),
+                      *(f"gasstate{idx}" for idx in range(sensor_number)),
+                      "stage_num", "stage_type",
+                      *(f"State{idx},V" for idx in range(sensor_number)))
+            header = ("Time", *(f"U{idx}" for idx in range(sensor_number)),
+                      *(f"Rn{idx}" for idx in range(sensor_number)),
+                      *(f"Rs{idx}" for idx in range(sensor_number)),
+                      *(f"T{idx}" for idx in range(sensor_number)),
+                      *(f"gasstate{idx}" for idx in range(sensor_number)),
+                      "stage_num", "stage_type",
+                      *(f"State{idx},V" for idx in range(sensor_number)))
+            return header_comment, header
         converter_funcs = self.converter_funcs_dicts()
         while not self.stopped:
-            sleep(0.01)
+            sleep(0.02)
             if not self.queue.empty():
                 data = self.queue.get()
                 us, rs, time_next_plus_t0, time_next, temperatures, gas_state, stage_num, stage_type, sensor_states = data
-                sensor_resistances = tuple(converter_func_dict[sensor_state](u) for converter_func_dict, u, sensor_state in zip(converter_funcs, us, sensor_states))
-
+                sensor_resistances = tuple(
+                    converter_func_dict[sensor_state](u) for converter_func_dict, u, sensor_state in
+                    zip(converter_funcs, us, sensor_states))
+                logger.debug(f"Call in cycle")
+                self.set_meas_tuple((us, rs, sensor_resistances, sensor_states, temperatures))
                 self.hold_method((sensor_resistances, rs, time_next))
-                fd.write(str((us, rs, sensor_resistances, time_next, temperatures, gas_state, stage_num, stage_type, sensor_states)) + "\n")
+                if not headed:
+                    header_comment, header = form_header(len(rs))
+                    csvwriter.writerow(header_comment)
+                    csvwriter.writerow(header)
+                    headed = True
+                csvwriter.writerow((time_next, *us, *rs, *sensor_resistances, *temperatures, *gas_state, stage_num, stage_type, *sensor_states))
+        while not self.queue.empty():
+            data = self.queue.get()
+            us, rs, time_next_plus_t0, time_next, temperatures, gas_state, stage_num, stage_type, sensor_states = data
+            sensor_resistances = tuple(
+                converter_func_dict[sensor_state](u) for converter_func_dict, u, sensor_state in
+                zip(converter_funcs, us, sensor_states))
+            logger.debug(f"Call in cycle")
+            self.set_meas_tuple((us, rs, sensor_resistances, sensor_states, temperatures))
+            self.hold_method((sensor_resistances, rs, time_next))
+            if not headed:
+                header_comment, header = form_header(len(rs))
+                csvwriter.writerow(header_comment)
+                csvwriter.writerow(header)
+                headed = True
+            csvwriter.writerow((time_next, *us, *rs, *sensor_resistances, *temperatures, *gas_state, stage_num,
+                                stage_type, *sensor_states))
+
         fd.close()
 
     def stop(self):
@@ -55,6 +121,8 @@ class QueueRunner():
 
 class OperationWidget(QtWidgets.QWidget):
 
+    stop_signal = Signal()
+    running_signal = Signal()
 
     def __init__(self, parent, log_level, global_settings, measurement_widget,
                  *args, **kwargs):
@@ -63,83 +131,203 @@ class OperationWidget(QtWidgets.QWidget):
         self.measurement_widget = measurement_widget
         self.gasstate_widget = parent.gasstate_widget
         self.runner = None
+        self.generator = None
         self.queue = Queue()
+        self.queue_runner = QueueRunner(self.queue, self.measurement_widget.get_voltage_to_resistance_funcs)
         self.settings = self.parent_py.settings_widget
-        self.settings.redraw_signal.connect(self.init_ui)
-        QtWidgets.QVBoxLayout(self)
+        self.settings.redraw_signal.connect(self.refresh_state)
+        layout = QtWidgets.QVBoxLayout(self)
         self.timer_plot = QTimer()
         self.timer_plot.setInterval(1000)
-        self.init_ui()
+        self.stop_signal.connect(self.stop)
+        self.running_signal.connect(self.on_running_signal)
+        self.values_set_timer = QTimer()
+        layout1 = QtWidgets.QHBoxLayout()
+        layout2 = QtWidgets.QHBoxLayout()
+        layout.addLayout(layout1)
+        layout.addLayout(layout2)
 
-
-    def init_ui(self):
-        clear_layout(self.layout())
-        self.runner = None
-
-        layout = self.layout()
-
-        self.status_label = QtWidgets.QLabel("Not loaded")
-
+        load_program_groupbox = QtWidgets.QGroupBox()
+        load_program_groupbox.setTitle("Program")
+        load_program_groupbox_layout = QtWidgets.QHBoxLayout(load_program_groupbox)
         load_program_button = QtWidgets.QPushButton("Load program")
         load_program_button.clicked.connect(self.load_program)
-        layout.addWidget(load_program_button)
 
+        self.load_label = QtWidgets.QLabel("Not loaded")
+        self.load_label.setFrameStyle(QFrame.Panel)
+        self.load_label.setStyleSheet("background-color:pink")
+        load_program_groupbox_layout.addWidget(load_program_button)
+        load_program_groupbox_layout.addWidget(self.load_label)
+        load_program_groupbox_layout.addStretch()
+
+        layout1.addWidget(load_program_groupbox)
+
+        controls_groupbox = QtWidgets.QGroupBox()
+        controls_groupbox.setTitle("Controls")
+        controls_groupbox_layout = QtWidgets.QHBoxLayout(controls_groupbox)
         start_button = QtWidgets.QPushButton("Start")
         stop_button = QtWidgets.QPushButton("Stop")
-        self.checkbox_if_send_u_or_r = QtWidgets.QCheckBox("Send U")
-        layout.addWidget(start_button)
-        layout.addWidget(stop_button)
-        layout.addWidget(self.checkbox_if_send_u_or_r)
         start_button.clicked.connect(self.start)
         stop_button.clicked.connect(self.stop)
+        self.checkbox_if_send_u_or_r = QtWidgets.QCheckBox("Send U")
+        controls_groupbox_layout.addWidget(start_button)
+        controls_groupbox_layout.addWidget(stop_button)
+        controls_groupbox_layout.addWidget(self.checkbox_if_send_u_or_r)
+        controls_groupbox_layout.addStretch()
 
+        layout1.addWidget(controls_groupbox)
+
+        sensor_lines_groupbox = QtWidgets.QGroupBox()
+        sensor_lines_groupbox.setTitle("Sensor lines toggle")
+        sensor_lines_groupbox_layout = QtWidgets.QHBoxLayout(sensor_lines_groupbox)
         self.plot_widget = AnswerPlotWidget(self)
+
+        self.pixmaps = []
+        for idx, color in enumerate(colors_for_lines):
+            layout3 = QtWidgets.QHBoxLayout()
+            pixmap = QPixmap(20, 20)
+            color = QColor(color)
+            pixmap.fill(color)
+            pixmap_label = ClickableLabel(idx, self)
+            pixmap_label.setPixmap(pixmap)
+            pixmap_label.setAlignment(Qt.AlignRight)
+            pixmap_label.clicked.connect(self.plot_widget.set_visible_invisible)
+            self.pixmaps.append(pixmap_label)
+            layout3.addWidget(pixmap_label)
+            layout3.addWidget(QtWidgets.QLabel(f"Sensor {idx + 1}"))
+            sensor_lines_groupbox_layout.addLayout(layout3)
+        sensor_lines_groupbox_layout.addStretch()
+
+        layout1.addWidget(sensor_lines_groupbox)
+        layout1.addStretch()
+
+        plot_options_groupbox = QtWidgets.QGroupBox()
+        plot_options_groupbox.setTitle("Plot options")
+        plot_options_groupbox_layout = QtWidgets.QHBoxLayout(plot_options_groupbox)
+
+        temp_button = QtWidgets.QPushButton("Only working")
+        temp_button.clicked.connect(self.turn_on_working_lines)
+        plot_options_groupbox_layout.addWidget(temp_button)
+        
+        temp_button = QtWidgets.QPushButton("All on")
+        temp_button.clicked.connect(self.turn_on_all_lines)
+        plot_options_groupbox_layout.addWidget(temp_button)
+        
+        temp_button = QtWidgets.QPushButton("All off")
+        temp_button.clicked.connect(self.turn_off_all_lines)
+        plot_options_groupbox_layout.addWidget(temp_button)
+        
+        plot_options_groupbox_layout.addStretch()
+
+        layout2.addWidget(plot_options_groupbox)
+
+
+        status_groupbox = QtWidgets.QGroupBox()
+        status_groupbox.setTitle("Status")
+        status_groupbox_layout = QtWidgets.QHBoxLayout(status_groupbox)
+
+        self.lamp = Lamp()
+        self.lamp.set_stop()
+        status_groupbox_layout.addWidget(self.lamp)
+
+        layout2.addWidget(status_groupbox)
+
+        layout2.addStretch(1)
+
         self.timer_plot.timeout.connect(self.plot_widget.plot_answer)
+        self.queue_runner.set_hold(self.plot_widget.hold_answer)
+        self.values_set_timer.timeout.connect(self.set_values_on_meas_widget)
         layout.addWidget(self.plot_widget)
-        self.queue_runner = QueueRunner(self.queue, self.plot_widget.hold_answer, self.measurement_widget.get_voltage_to_resistance_funcs)
+
+    def refresh_state(self):
+        self.stop()
+        self.runner = None
+        if self.generator is None:
+            self.load_label.setText("Not loaded")
+            self.load_label.setStyleSheet("background-color:pink")
+        else:
+            self.load_label.setText("Loaded")
+            self.load_label.setStyleSheet("background-color:palegreen")
 
     def get_checkbox_state(self):
         return self.checkbox_if_send_u_or_r.isChecked()
 
     def start(self):
-        if self.runner:
-            self.runner.start()
-        if self.queue_runner:
-            self.queue_runner.start()
-        if not self.timer_plot.isActive():
-            self.timer_plot.start()
-
-    def stop(self):
-        if self.runner:
-            self.runner.stop()
-        if self.queue_runner:
-            self.queue_runner.stop()
-        if self.timer_plot.isActive():
-            self.timer_plot.stop()
-
-    def load_program(self):
-        filename, filter = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Open program", "./tests", "Program file (*.yaml)")
-        if not filename:
-            self.status_label.setText("Not loaded")
-            return
-        try:
-            loaded = yaml.load(pathlib.Path(filename).read_text(), yaml.Loader)
-        except:
-            raise
-        else:
-            generator = ProgramGenerator(loaded)
-            with open("./tests/parsed.txt", "w") as fd:
-                for time_, values in generator.parse_program_to_queue():
-                    fd.write(f"{time_}, {values}\n")
+        if self.load_label.text() == "Loaded":
+            self.refresh_state()
             self.runner = ProgramRunner(
-                generator, self.settings.get_new_ms,
+                self.generator, self.settings.get_new_ms,
                 self.measurement_widget.get_sensor_types_list,
                 self.measurement_widget.get_convert_funcs,
                 self.settings.get_variables()[2],
                 self.gasstate_widget.send_state,
                 self.get_checkbox_state,
-                self.queue)
+                self.queue,
+                self.stop_signal, self.running_signal)
+            self.plot_widget.clear_plot()
+            self.runner.start()
+            self.queue_runner.start()
+            self.timer_plot.start()
+            self.values_set_timer.setInterval(int(self.generator.program.settings.step * 500))
+            self.values_set_timer.start()
+
+    def stop(self):
+        if self.runner is not None:
+            self.runner.stop()
+            self.runner.thread.join()
+        self.queue_runner.stop()
+        self.queue_runner.thread.join()
+        self.timer_plot.stop()
+        self.values_set_timer.stop()
+        self.lamp.set_stop()
+
+    def load_program(self):
+        filename, filter = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Open program", "./tests", "Program file (*.yaml)")
+        if not filename:
+            self.load_label.setText("Not loaded")
+            self.load_label.setStyleSheet("background-color:pink")
+            return
+        try:
+            loaded = yaml.load(pathlib.Path(filename).read_text(), yaml.Loader)
+        except:
+            self.load_label.setText("Not loaded")
+            self.load_label.setStyleSheet("background-color:pink")
+            raise
+        else:
+            self.generator = ProgramGenerator(loaded)
+            with open("./tests/parsed.txt", "w") as fd:
+                for time_, values in self.generator.parse_program_to_queue():
+                    fd.write(f"{time_}, {values}\n")
+            self.load_label.setText("Loaded")
+            self.load_label.setStyleSheet("background-color:palegreen")
+
+    def set_values_on_meas_widget(self):
+        results = self.queue_runner.get_meas_tuple()
+        if results is not None:
+            self.measurement_widget.set_results_values_to_widgets(*results)
+
+    def turn_on_working_lines(self):
+        if self.plot_widget:
+            for state, pixmap in zip(self.measurement_widget.get_working_widgets(), self.pixmaps):
+                if state != pixmap.state:
+                    pixmap.click()
+
+    def turn_on_all_lines(self):
+        if self.plot_widget:
+            for pixmap in self.pixmaps:
+                if not pixmap.state:
+                    pixmap.click()
+
+    def turn_off_all_lines(self):
+        if self.plot_widget:
+            for pixmap in self.pixmaps:
+                if pixmap.state:
+                    pixmap.click()
+
+    def on_running_signal(self):
+        self.lamp.set_running()
+
 
 
 class ProgramRunner:
@@ -148,8 +336,12 @@ class ProgramRunner:
                  get_sensor_types_list, get_convert_funcs, multirange,
                  send_gasstate_func,
                  checkbox_state,
-                 queue):
+                 queue,
+                 stop_signal,
+                 running_signal):
         self.stopped = True
+        self.stop_signal = stop_signal
+        self.running_signal = running_signal
         self.program_generator = program_generator
         self.program = self.program_generator.parse_program_to_queue()
         self.get_ms_method = get_ms_method
@@ -185,37 +377,44 @@ class ProgramRunner:
                                       True,
                                   ] * 12
         while not self.stopped:
-            time_next, (temperatures, gas_state, stage_num,
-                        stage_type) = next(self.program)
-            time_next_plus_t0 = time_0 + time_next
-            while time() < time_next_plus_t0:
-                sleep(time_sleep)
             try:
-                logger.debug(f"{time()} {time_next_plus_t0} {time_next}")
-                if self.checkbox_state():
-                    converted = self.convert_to_voltages(temperatures)
-                    us, rs = ms.full_request(converted, request_type=MS_ABC.REQUEST_U,
-                                             sensor_types_list=sensor_types_list)
-                else:
-                    converted = self.convert_to_resistances(temperatures)
-                    us, rs = ms.full_request(converted,
-                        request_type=MS_ABC.REQUEST_R,
-                        sensor_types_list=sensor_types_list)
-            except MS_ABC.MSException:
-                self.clear_ms_state(ms)
-                raise
+                time_next, (temperatures, gas_state, stage_num,
+                            stage_type) = next(self.program)
+            except StopIteration:
+                self.stop_signal.emit()
+                self.stopped = True
             else:
+                self.running_signal.emit()
+                time_next_plus_t0 = time_0 + time_next
+                while time() < time_next_plus_t0:
+                    sleep(time_sleep)
                 try:
-                    self.send_gasstate_func(gas_state)
-                except:
-                    logger.error("Cant send gas_state")
-                finally:
-                    self.queue.put((us, rs, time_next_plus_t0, time_next,
-                                      temperatures, gas_state, stage_num,
-                                      stage_type, sensor_states))
-                    self.analyze_us(ms, us, sensor_states,
-                                    sensor_stab_up_states,
-                                    sensor_stab_down_states)
+                    logger.debug(f"{time()} {time_next_plus_t0} {time_next}")
+                    if self.checkbox_state():
+                        converted = self.convert_to_voltages(temperatures)
+                        us, rs = ms.full_request(converted, request_type=MS_ABC.REQUEST_U,
+                                                 sensor_types_list=sensor_types_list)
+                    else:
+                        converted = self.convert_to_resistances(temperatures)
+                        us, rs = ms.full_request(converted,
+                                                 request_type=MS_ABC.REQUEST_R,
+                                                 sensor_types_list=sensor_types_list)
+                except MS_ABC.MSException:
+                    self.stop_signal.emit()
+                    self.clear_ms_state(ms)
+                    raise
+                else:
+                    try:
+                        self.send_gasstate_func(gas_state)
+                    except:
+                        logger.error("Cant send gas_state")
+                    finally:
+                        self.queue.put((us, rs, time_next_plus_t0, time_next,
+                                        temperatures, gas_state, stage_num,
+                                        stage_type, sensor_states))
+                        self.analyze_us(ms, us, sensor_states,
+                                        sensor_stab_up_states,
+                                        sensor_stab_down_states)
         self.clear_ms_state(ms)
 
     @staticmethod
@@ -257,23 +456,68 @@ class AnswerPlotWidget(pg.PlotWidget):
         super().__init__(*args, **kwargs)
         self.sensor_number = 12
         self.number_of_dots = 1200
+
         self.rs = np.empty(shape=(self.sensor_number, self.number_of_dots))
         self.us = np.empty(shape=(self.sensor_number, self.number_of_dots))
         self.times = np.empty(shape=(self.number_of_dots,))
         self.drawing_index = 0
-        legend = pg.LegendItem(offset=(-10, 10), labelTextColor=pg.mkColor("#FFFFFF"), brush=pg.mkBrush(pg.mkColor("#111111")))
-        legend.setParentItem(self.getPlotItem())
+        self.emphasized_lines = []
+        self.hidden_lines = []
+        legend = pg.LegendItem(offset=(-10, 10), labelTextColor=pg.mkColor("#FFFFFF"),
+                               brush=pg.mkBrush(pg.mkColor("#111111")))
+        plot_item = self.getPlotItem()
+        self.vboxitem = plot_item.getViewBox()
+        legend.setParentItem(plot_item)
+        plot_item.showGrid(x=True, y=True)
+        plot_item.setLogMode(y=True)
+
         self.plot_data_items = [
             self.plot([0], [0], name=f"Sensor {i + 1}") for i in range(self.sensor_number)
         ]
         for idx, (plot_data_item, color) in enumerate(zip(self.plot_data_items, colors_for_lines)):
             plot_data_item.setPen(pg.mkPen(pg.mkColor(color), width=2))
+            plot_data_item.setCurveClickable(True)
+            plot_data_item.sigClicked.connect(self.line_clicked)
             legend.addItem(plot_data_item, f"Sensor {idx + 1}")
         self.lock = threading.Lock()
 
+    def line_clicked(self, line):
+        logger.debug("Line clicked")
+        if line in self.emphasized_lines:
+            line.setShadowPen(pg.mkPen(None))
+            self.emphasized_lines.remove(line)
+        else:
+            line.setShadowPen(pg.mkPen(pg.mkColor("#666666"), width=8))
+            self.emphasized_lines.append(line)
+
+    def set_visible_invisible(self, index):
+        line = self.plot_data_items[index]
+        if line in self.vboxitem.addedItems:
+            self.vboxitem.removeItem(line)
+        else:
+            self.vboxitem.addItem(line)
+
+    def set_visible(self, index):
+        line = self.plot_data_items[index]
+        if line not in self.vboxitem.addedItems:
+            self.vboxitem.addItem(line)
+
+    def set_invisible(self, index):
+        line = self.plot_data_items[index]
+        if line in self.vboxitem.addedItems:
+            self.vboxitem.removeItem(line)
+
+    def clear_plot(self):
+        self.drawing_index = 0
+        self.rs = np.empty(shape=(self.sensor_number, self.number_of_dots))
+        self.us = np.empty(shape=(self.sensor_number, self.number_of_dots))
+        self.times = np.empty(shape=(self.number_of_dots,))
+        for plot_item_data in self.plot_data_items:
+            plot_item_data.setData(x=[], y=[])
+
     def hold_answer(self, answer):
         with self.lock:
-            us, rs, time_next= answer
+            us, rs, time_next = answer
             logger.debug(f"Start add dots {time_next}")
 
             if self.drawing_index == self.number_of_dots:

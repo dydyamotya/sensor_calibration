@@ -64,6 +64,7 @@ class UCalibrationWidget(QtWidgets.QWidget):
         for _ in range(3):
             hbox_layout.addWidget(OneSensorFrame(
                 self, self.settings_widget, self.debug_level, self.global_settings))
+        hbox_layout.addStretch()
 
 
 class PlusWidget(QtWidgets.QWidget):
@@ -86,12 +87,13 @@ class OneSensorFrame(QtWidgets.QWidget):
         self.debug_level = debug_level
         self.global_settings = global_settings
         self.labels = []
-
+        main_layout =QtWidgets.QVBoxLayout(self)
         layout = QtWidgets.QGridLayout()
+        main_layout.addLayout(layout)
+        main_layout.addStretch()
         layout.setColumnStretch(0, 0)
         layout.setColumnStretch(1, 1)
         layout.setColumnStretch(2, 0)
-        self.setLayout(layout)
 
         row = 0
 

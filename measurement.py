@@ -1,3 +1,4 @@
+from PySide2.QtWidgets import QFrame
 from yaml import load, dump
 from collections import UserDict
 import numpy as np
@@ -24,7 +25,7 @@ r4_to_int = dict(zip(r4_str_values, range(1, 4)))
 r4_to_float = dict(zip(r4_str_values, (1e5, 1.1e6, 1.11e7)))
 
 
-class SensorPositionWidget(QtWidgets.QWidget):
+class SensorPositionWidget(QtWidgets.QGroupBox):
 
     def __init__(self, parent, sensor_num, machine_name):
         super(SensorPositionWidget, self).__init__(parent)
@@ -33,6 +34,7 @@ class SensorPositionWidget(QtWidgets.QWidget):
         self.machine_name = machine_name
         self.temperatures_loaded = False
         self.resistances_convertors_loaded = False
+        self.setTitle(f"Sensor {sensor_num + 1}")
         self._init_ui()
 
     def _get_sensor_positions_from_db(self):
@@ -44,9 +46,9 @@ class SensorPositionWidget(QtWidgets.QWidget):
             self.sensor_positions = list(
                 SensorPosition.select(SensorPosition, fn.MAX(
                     SensorPosition.id)).where(
-                        (SensorPosition.machine == machine_id)
-                        & (SensorPosition.sensor_num == sensor_num +
-                           1)).group_by(SensorPosition.r4))
+                    (SensorPosition.machine == machine_id)
+                    & (SensorPosition.sensor_num == sensor_num +
+                       1)).group_by(SensorPosition.r4))
         except (IndexError, SensorPosition.DoesNotExist):
             self.sensor_positions = None
             self.resistances_convertors_loaded = False
@@ -58,18 +60,35 @@ class SensorPositionWidget(QtWidgets.QWidget):
     def _init_ui(self):
         machine_name = self.machine_name
         self._get_sensor_positions_from_db()
+        main_layout = QtWidgets.QHBoxLayout(self)
+        layout = QtWidgets.QVBoxLayout()
+        layout2 = QtWidgets.QFormLayout()
+        main_layout.addLayout(layout, 1)
+        main_layout.addLayout(layout2, 1)
+        self.current_values_layout_labels = {label: QtWidgets.QLabel() for label in ("U:", "Rn:", "Rs:", "Mode:", "T:")}
+        self.working_sensor = QtWidgets.QCheckBox("Working")
+        self.working_sensor.stateChanged.connect(self.change_color)
+        for label, widget in self.current_values_layout_labels.items():
+            widget.setFrameStyle(QFrame.Panel)
+            widget.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse | QtCore.Qt.TextSelectableByKeyboard)
+            widget.setStyleSheet("background-color:pink")
+            layout2.addRow(label, widget)
+
         if self.sensor_positions is None or len(self.sensor_positions) == 0:
-            layout = QtWidgets.QVBoxLayout(self)
-            self.working_sensor = QtWidgets.QCheckBox("")
             layout.addWidget(self.working_sensor)
             layout.addWidget(QtWidgets.QLabel("No data"))
         else:
-            layout = QtWidgets.QVBoxLayout(self)
             r4s = [
                 sensor_position.r4 for sensor_position in self.sensor_positions
             ]
 
             positions_r4s_combobox = QtWidgets.QComboBox()
+            if self.resistances_convertors_loaded and len(self.sensor_positions) == 3:
+                positions_r4s_combobox.setStyleSheet("background-color:palegreen")
+            elif self.resistances_convertors_loaded and len(self.sensor_positions) < 3:
+                positions_r4s_combobox.setStyleSheet("background-color:palegoldenrod")
+            else:
+                positions_r4s_combobox.setStyleSheet("background-color:pink")
             positions_r4s_combobox.addItems(r4s)
             positions_r4s_combobox.currentTextChanged.connect(
                 self.choose_sensor_range)
@@ -78,7 +97,6 @@ class SensorPositionWidget(QtWidgets.QWidget):
             buttons_layout = QtWidgets.QHBoxLayout()
             layout.addLayout(buttons_layout, stretch=0)
 
-            self.working_sensor = QtWidgets.QCheckBox("")
             buttons_layout.addWidget(self.working_sensor)
 
             sensor_position_layout = QtWidgets.QFormLayout()
@@ -87,16 +105,29 @@ class SensorPositionWidget(QtWidgets.QWidget):
                                           QtWidgets.QLabel(f"{machine_name}"))
             self.labels = {
                 label: QtWidgets.QLabel()
-                for label in ("sensor_num", "rs_u1", "rs_u2", "datetime")
+                for label in ("rs_u1", "rs_u2", "datetime")
             }
             for label, label_widget in self.labels.items():
                 sensor_position_layout.addRow(label, label_widget)
 
             self.choose_sensor_range(positions_r4s_combobox.currentText())
+        layout.addStretch()
 
     def _init_sensor_position(self, sensor_position):
-        for label, label_widget in self.labels.items():
-            label_widget.setText(str(getattr(sensor_position, label)))
+        for (label, label_widget), format_ in zip(self.labels.items(), (
+        lambda x: f"{x:2.4f}", lambda x: f"{x:2.4f}", lambda x: x.strftime("%Y.%m.%d"))):
+            label_widget.setText(format_(getattr(sensor_position, label)))
+
+    def change_color(self):
+        if self.working_sensor.isChecked() and self.temperatures_loaded:
+            for label, widget in self.current_values_layout_labels.items():
+                widget.setStyleSheet("background-color:palegreen")
+        elif self.working_sensor.isChecked() and not self.temperatures_loaded:
+            for label, widget in self.current_values_layout_labels.items():
+                widget.setStyleSheet("background-color:palegoldenrod")
+        else:
+            for label, widget in self.current_values_layout_labels.items():
+                widget.setStyleSheet("background-color:pink")
 
     def choose_sensor_range(self, range_):
         sensor_position, *_ = [
@@ -129,11 +160,11 @@ class SensorPositionWidget(QtWidgets.QWidget):
                 f"Calibration T_to_U successful for {self.sensor_num} {self.machine_name} sensor"
             )
 
-
         res = linregress(self.temperatures, self.resistances)
         self.func_T_to_R = lambda x: res.intercept + res.slope * x
 
         self.temperatures_loaded = True
+        self.change_color()
 
     def get_resistance_for_temperature(self, temperature: float):
         if not self.temperatures_loaded:
@@ -169,8 +200,15 @@ class SensorPositionWidget(QtWidgets.QWidget):
                     rs_u1 = float(sensor_position.rs_u1)
                     rs_u2 = float(sensor_position.rs_u2)
                     r4 = r4_to_float[sensor_position.r4]
+
+                    vertical_asimptote = 2.5 + 4.068 * (2.5 - rs_u2)
+
                     def f(u):
-                        return (rs_u1 - rs_u2) * r4 / ((2.5 + 2.5 * 4.068 - u) / 4.068 - rs_u2) - r4
+                        if u < vertical_asimptote:
+                            return (rs_u1 - rs_u2) * r4 / ((2.5 + 2.5 * 4.068 - u) / 4.068 - rs_u2) - r4
+                        else:
+                            return 1e14
+
                     funcs_dict[r4_to_int[sensor_position.r4]] = f
                 else:
                     logger.debug(f"R4 not in set of calibrated {r4_str} {r4s}")
@@ -180,6 +218,11 @@ class SensorPositionWidget(QtWidgets.QWidget):
             for r4_str in r4_str_values:
                 funcs_dict[r4_to_int[r4_str]] = lambda u: u
         return funcs_dict
+
+    def set_labels(self, u, r, sr, mode, temperature):
+        for value, widget in zip((u, r, sr, mode, temperature), self.current_values_layout_labels.values()):
+            widget.setText(str(value))
+
 
 class MeasurementWidget(QtWidgets.QWidget):
 
@@ -208,14 +251,18 @@ class MeasurementWidget(QtWidgets.QWidget):
         load_calibration_button.clicked.connect(self.load_calibration)
 
         self.load_status_label = QtWidgets.QLabel("Not loaded")
+        self.load_status_label.setFrameStyle(QFrame.Panel)
+        self.load_status_label.setStyleSheet("background-color:pink")
         buttons_layout.addWidget(load_calibration_button)
         buttons_layout.addWidget(self.load_status_label)
+        buttons_layout.addStretch()
 
         self.css_boxes = CssCheckBoxes()
         self.layout().addWidget(self.css_boxes)
 
         sensor_position_grid_layout = QtWidgets.QGridLayout()
         self.layout().addLayout(sensor_position_grid_layout)
+        self.layout().addStretch()
         for i in range(sensor_number):
             sensor_position_widget = SensorPositionWidget(
                 self, i, machine_name)
@@ -233,16 +280,18 @@ class MeasurementWidget(QtWidgets.QWidget):
             npzfile = np.load(filename)
             try:
                 voltages, resistances, temperatures = npzfile[
-                    "voltages"], npzfile["resistances"], npzfile[
-                        "temperatures"]
+                                                          "voltages"], npzfile["resistances"], npzfile[
+                                                          "temperatures"]
             except KeyError:
                 self.load_status_label.setText("Not loaded")
+                self.load_status_label.setStyleSheet("background-color:pink")
             else:
                 for voltage_row, resistance_row, temperatures_row, widget in zip(
                         voltages, resistances, temperatures, self.widgets):
                     widget.load_calibration(voltage_row, resistance_row,
                                             temperatures_row)
                 self.load_status_label.setText("Loaded")
+                self.load_status_label.setStyleSheet("background-color:palegreen")
 
     def get_sensor_types_list(self):
         if self.css_boxes:
@@ -269,3 +318,10 @@ class MeasurementWidget(QtWidgets.QWidget):
 
     def get_voltage_to_resistance_funcs(self):
         return tuple(widget.get_voltage_to_resistance_funcs() for widget in self.widgets)
+
+    def set_results_values_to_widgets(self, us, rs, srs, modes, temperatures):
+        for u, r, sr, mode, temperature, widget in zip(us, rs, srs, modes, temperatures, self.widgets):
+            widget.set_labels(u, r, sr, mode, temperature)
+
+    def get_working_widgets(self):
+        return [widget.working_sensor.isChecked() for widget in self.widgets]
