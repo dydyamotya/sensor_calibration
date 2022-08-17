@@ -58,6 +58,10 @@ class QueueRunner():
                 ".txt")
             self.thread.start()
 
+    def join(self):
+        if self.thread is not None:
+            self.thread.join()
+
     def cycle(self):
         fd = self.filename.open("w", newline="")
         csvwriter = csv.writer(fd, delimiter="\t")
@@ -274,9 +278,9 @@ class OperationWidget(QtWidgets.QWidget):
     def stop(self):
         if self.runner is not None:
             self.runner.stop()
-            self.runner.thread.join()
+            self.runner.join()
         self.queue_runner.stop()
-        self.queue_runner.thread.join()
+        self.queue_runner.join()
         self.timer_plot.stop()
         self.values_set_timer.stop()
         self.lamp.set_stop()
@@ -363,6 +367,10 @@ class ProgramRunner:
 
     def stop(self):
         self.stopped = True
+
+    def join(self):
+        if self.thread is not None:
+            self.thread.join()
 
     def cycle(self):
         ms: MS_Uni = self.get_ms_method()
