@@ -18,7 +18,6 @@ import pyqtgraph as pg
 from queue import Queue
 import csv
 
-
 logger = logging.getLogger(__name__)
 
 colors_for_lines = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22',
@@ -66,22 +65,22 @@ class QueueRunner():
         fd = self.filename.open("w", newline="")
         csvwriter = csv.writer(fd, delimiter="\t")
         headed = False
+
         def form_header(sensor_number):
             header_comment = ("Time,s", *(f"U{idx},V" for idx in range(sensor_number)),
-                      *(f"Rn{idx},Ohm" for idx in range(sensor_number)),
-                      *(f"Rs{idx},Ohm" for idx in range(sensor_number)),
-                      *(f"T{idx},C" for idx in range(sensor_number)),
-                      *(f"gasstate{idx}" for idx in range(sensor_number)),
-                      "stage_num", "stage_type",
-                      *(f"State{idx},V" for idx in range(sensor_number)))
+                              *(f"Rn{idx},Ohm" for idx in range(sensor_number)),
+                              *(f"Rs{idx},Ohm" for idx in range(sensor_number)),
+                              *(f"T{idx},C" for idx in range(sensor_number)),
+                              "gas_state", "stage_num", "stage_type",
+                              *(f"State{idx},V" for idx in range(sensor_number)))
             header = ("Time", *(f"U{idx}" for idx in range(sensor_number)),
                       *(f"Rn{idx}" for idx in range(sensor_number)),
                       *(f"Rs{idx}" for idx in range(sensor_number)),
                       *(f"T{idx}" for idx in range(sensor_number)),
-                      *(f"gasstate{idx}" for idx in range(sensor_number)),
-                      "stage_num", "stage_type",
+                      "gas_state", "stage_num", "stage_type",
                       *(f"State{idx},V" for idx in range(sensor_number)))
             return header_comment, header
+
         converter_funcs = self.converter_funcs_dicts()
         while not self.stopped:
             sleep(0.02)
@@ -99,7 +98,8 @@ class QueueRunner():
                     csvwriter.writerow(header_comment)
                     csvwriter.writerow(header)
                     headed = True
-                csvwriter.writerow((time_next, *us, *rs, *sensor_resistances, *temperatures, *gas_state, stage_num, stage_type, *sensor_states))
+                csvwriter.writerow((time_next, *us, *rs, *sensor_resistances, *temperatures, gas_state, stage_num,
+                                    stage_type, *sensor_states))
         while not self.queue.empty():
             data = self.queue.get()
             us, rs, time_next_plus_t0, time_next, temperatures, gas_state, stage_num, stage_type, sensor_states = data
@@ -114,7 +114,7 @@ class QueueRunner():
                 csvwriter.writerow(header_comment)
                 csvwriter.writerow(header)
                 headed = True
-            csvwriter.writerow((time_next, *us, *rs, *sensor_resistances, *temperatures, *gas_state, stage_num,
+            csvwriter.writerow((time_next, *us, *rs, *sensor_resistances, *temperatures, gas_state, stage_num,
                                 stage_type, *sensor_states))
 
         fd.close()
@@ -124,7 +124,6 @@ class QueueRunner():
 
 
 class OperationWidget(QtWidgets.QWidget):
-
     stop_signal = Signal()
     running_signal = Signal()
 
@@ -212,19 +211,18 @@ class OperationWidget(QtWidgets.QWidget):
         temp_button = QtWidgets.QPushButton("Only working")
         temp_button.clicked.connect(self.turn_on_working_lines)
         plot_options_groupbox_layout.addWidget(temp_button)
-        
+
         temp_button = QtWidgets.QPushButton("All on")
         temp_button.clicked.connect(self.turn_on_all_lines)
         plot_options_groupbox_layout.addWidget(temp_button)
-        
+
         temp_button = QtWidgets.QPushButton("All off")
         temp_button.clicked.connect(self.turn_off_all_lines)
         plot_options_groupbox_layout.addWidget(temp_button)
-        
+
         plot_options_groupbox_layout.addStretch()
 
         layout2.addWidget(plot_options_groupbox)
-
 
         status_groupbox = QtWidgets.QGroupBox()
         status_groupbox.setTitle("Status")
@@ -336,7 +334,6 @@ class OperationWidget(QtWidgets.QWidget):
 
     def on_running_signal(self):
         self.lamp.set_running()
-
 
 
 class ProgramRunner:
@@ -523,6 +520,7 @@ class AnswerPlotWidget(pg.PlotWidget):
     def set_sensor_number(self, sensor_number):
         self.sensor_number = sensor_number
         self.clear_plot()
+
     def clear_plot(self):
         self.drawing_index = 0
         self.rs = np.empty(shape=(self.sensor_number, self.number_of_dots))
