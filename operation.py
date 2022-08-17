@@ -244,7 +244,9 @@ class OperationWidget(QtWidgets.QWidget):
         layout.addWidget(self.plot_widget)
 
     def refresh_state(self):
+        comport, sensor_number, multirange, *_ = self.settings.get_variables()
         self.stop()
+        self.plot_widget.set_sensor_number(sensor_number)
         self.runner = None
         if self.generator is None:
             self.load_label.setText("Not loaded")
@@ -259,11 +261,12 @@ class OperationWidget(QtWidgets.QWidget):
     def start(self):
         if self.load_label.text() == "Loaded":
             self.refresh_state()
+            comport, sensor_number, multirange, *_ = self.settings.get_variables()
             self.runner = ProgramRunner(
                 self.generator, self.settings.get_new_ms,
                 self.measurement_widget.get_sensor_types_list,
                 self.measurement_widget.get_convert_funcs,
-                self.settings.get_variables()[2],
+                multirange,
                 self.gasstate_widget.send_state,
                 self.get_checkbox_state,
                 self.queue,
@@ -517,6 +520,9 @@ class AnswerPlotWidget(pg.PlotWidget):
         if line in self.vboxitem.addedItems:
             self.vboxitem.removeItem(line)
 
+    def set_sensor_number(self, sensor_number):
+        self.sensor_number = sensor_number
+        self.clear_plot()
     def clear_plot(self):
         self.drawing_index = 0
         self.rs = np.empty(shape=(self.sensor_number, self.number_of_dots))
