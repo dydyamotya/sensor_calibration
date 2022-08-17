@@ -54,7 +54,7 @@ class QueueRunner():
         if self.hold_method is not None and self.stopped:
             self.stopped = False
             self.thread = threading.Thread(target=self.cycle)
-            self.filename = (pathlib.Path("./tests") / datetime.datetime.now().strftime("%Y%m%d-%H:%M:%S")).with_suffix(
+            self.filename = (pathlib.Path("./tests") / datetime.datetime.now().strftime("%Y%m%d-%H%M%S")).with_suffix(
                 ".txt")
             self.thread.start()
 
