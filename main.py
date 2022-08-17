@@ -20,7 +20,7 @@ class EquipmentSettings(QtWidgets.QWidget):
     redraw_signal = QtCore.Signal(int)
 
     def __init__(self, global_settings, *args, **kwargs):
-        super().__init__(*args, f=QtCore.Qt.Tool, **kwargs)
+        super().__init__(*args, f=QtCore.Qt.Tool | QtCore.Qt.WindowStaysOnTopHint, **kwargs)
         layout = QtWidgets.QFormLayout()
         self.setLayout(layout)
         self.setWindowTitle("Settings")
@@ -83,7 +83,7 @@ class GasStateWidget(QtWidgets.QWidget):
     redraw_signal = QtCore.Signal(int)
 
     def __init__(self, global_settings, *args, **kwargs):
-        super().__init__(*args, f=QtCore.Qt.Tool, **kwargs)
+        super().__init__(*args, f=QtCore.Qt.Tool | QtCore.Qt.WindowStaysOnTopHint, **kwargs)
         layout = QtWidgets.QFormLayout()
         self.setLayout(layout)
         self.setWindowTitle("Settings")
@@ -96,13 +96,17 @@ class GasStateWidget(QtWidgets.QWidget):
         layout.addRow("Test state:", self.gas_state_test)
 
         self.gas_state_test.returnPressed.connect(self.send_state_test)
+        self.prev_gas_state = None
 
     def send_state(self, state_num: int):
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        ip, port = self.gas_state_server_address.text().split(":")
-        s.connect((ip, int(port)))
-        s.send(str(state_num).encode("utf-8"))
-        s.close()
+        if state_num != self.prev_gas_state:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            ip, port = self.gas_state_server_address.text().split(":")
+            s.connect((ip, int(port)))
+            s.send(str(state_num).encode("utf-8"))
+            s.close()
+            self.prev_gas_state = state_num
+
 
     def send_state_test(self):
         self.send_state(self.gas_state_test.text())
