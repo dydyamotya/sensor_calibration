@@ -1,0 +1,24 @@
+temperatures: &cyclic_temperature_example
+  time: [0, 9, 10, 19, 20, 29, 30, 39, 40, 49, 50, 60]
+  temperature: [500, 500, 200, 200, 300, 300, 400, 400, 200, 200, 500, 500]
+
+settings:
+  frequency: 10
+
+program:
+  - type: "cyclic"
+    repeat: 1200
+    temperatures: *cyclic_temperature_example
+    gas_states:
+      - state:
+        - state: {time: [1, 60], substates: [0, 1]} # 100 ppm
+          number: 1
+        - state: {time: [1, 60], substates: [0, 2]}
+          number: 1
+        number: 2
+      - state:
+        - state: {time: [1, 60], substates: [3, 4]} # 40 ppm
+          number: 1
+        - state: {time: [1, 60], substates: [3, 5]}
+          number: 1
+        number: 2

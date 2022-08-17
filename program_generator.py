@@ -45,7 +45,26 @@ class ProgramGenerator:
                 return temp
         else:
             return (temperatures, ) * 12
+    @staticmethod
+    def process_gas_state(gas_state, max_time):
+        if isinstance(gas_state, munch.Munch):
+            times = gas_state.time
+            substates = gas_state.substates
+            times = [0] + times + [max_time]
+            substates = substates + [substates[0], substates[0]]
+            gas_get_func = interp1d(times, substates, kind="previous")
+        else:
+            gas_get_func = lambda x: gas_state
+        return gas_get_func
 
+    @staticmethod
+    def process_gas_states_cycle(gas_states):
+        for gas_state in itertools.chain(*[(gas_stage.state,) * gas_stage.number for gas_stage in gas_states]):
+            if isinstance(gas_state, list):
+                for sub_gas_state_ in itertools.chain(*[(sub_gas_stage.state,) * sub_gas_stage.number for sub_gas_stage in gas_state]):
+                    yield sub_gas_state_
+            else:
+                yield gas_state
 
     @staticmethod
     def _parse_all_program(program, settings):
@@ -89,7 +108,9 @@ class ProgramGenerator:
         func = interp1d(temperatures.time, temperatures.temperature)
         max_time = max(temperatures.time)
         stage_type = stage.type
-        for gas_state, _ in zip(itertools.cycle([(gas_stage.state,) * gas_stage.number for gas_stage in stage.gas_states]), range(stage.repeat)):
+        for gas_state, _ in zip(itertools.cycle(ProgramGenerator.process_gas_states_cycle(stage.gas_states)), range(stage.repeat)):
+            gas_get_func = ProgramGenerator.process_gas_state(gas_state, max_time)
             stage_num = ProgramGenerator.get_stage_number()
             for inter_time in np.arange(0, max_time, step):
-                yield ProgramGenerator.convert_temperatures(float(func(inter_time))), gas_state, stage_num, stage_type
+                yield ProgramGenerator.convert_temperatures(float(func(inter_time))), gas_get_func(inter_time), stage_num, stage_type
+

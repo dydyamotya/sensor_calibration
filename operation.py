@@ -296,9 +296,11 @@ class OperationWidget(QtWidgets.QWidget):
             raise
         else:
             self.generator = ProgramGenerator(loaded)
-            with open("./tests/parsed.txt", "w") as fd:
-                for time_, values in self.generator.parse_program_to_queue():
-                    fd.write(f"{time_}, {values}\n")
+            # logger.debug(f"Parsing started {datetime.datetime.now()}")
+            # with open("./tests/parsed.txt", "w") as fd:
+            #     for time_, values in self.generator.parse_program_to_queue():
+            #         fd.write(f"{time_}, {values}\n")
+            # logger.debug(f"Parsing stopped {datetime.datetime.now()}")
             self.load_label.setText("Loaded")
             self.load_label.setStyleSheet("background-color:palegreen")
 
