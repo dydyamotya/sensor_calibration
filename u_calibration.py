@@ -371,7 +371,7 @@ class ImportCalibrationWidget(QtWidgets.QWidget):
             text = "Everything imported"
         message_box.setText(text)
         message_box.exec_()
-        self.settings_widget.redraw_signal.emit()
+        self.settings_widget.redraw_signal.emit(machine_id)
 
     def toggle_visibility(self):
         self.setVisible(not self.isVisible())
