@@ -595,7 +595,7 @@ class SaveButtons(QtWidgets.QWidget):
 
     def load_parameters(self):
         filename, filters = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Save Parameters", "./tests", "Parameters File (*.par)"
+            self, "Load Parameters", "./tests", "Parameters File (*.par)"
         )
         if not filename:
             return

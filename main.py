@@ -1,7 +1,9 @@
+import configparser
+
 from PySide2 import QtWidgets, QtCore
 import argparse
 import logging
-from u_calibration import UCalibrationWidget
+from u_calibration import UCalibrationWidget, ImportCalibrationWidget
 from calibration import CalibrationWidget
 from measurement import MeasurementWidget
 from operation import OperationWidget
@@ -11,7 +13,7 @@ from database_widgets import DatabaseLeaderComboboxWidget, DatabaseNonleaderComb
 from sensor_system import MS_Uni, MS_ABC
 import socket
 
-from models import Machine
+from models import Machine, SensorPosition
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +117,8 @@ class GasStateWidget(QtWidgets.QWidget):
         self.setVisible(not self.isVisible())
 
 
+
+
 def main():
     app = QtWidgets.QApplication()
     settings = QtCore.QSettings("MotyaSoft", "SensorinGas Beta")
@@ -141,6 +145,11 @@ def main():
     logger.debug("After gasstate init")
     action = QtWidgets.QAction("GasState Server", main_window)
     action.triggered.connect(main_window.gasstate_widget.toggle_visibility)
+    menu_bar.addAction(action)
+
+    main_window.import_widget = ImportCalibrationWidget(settings, main_window)
+    action = QtWidgets.QAction("Import", main_window)
+    action.triggered.connect(main_window.import_widget.toggle_visibility)
     menu_bar.addAction(action)
 
     central_widget = QtWidgets.QTabWidget()

@@ -1,3 +1,4 @@
+import configparser
 import datetime
 
 from yaml import load, dump
@@ -288,7 +289,7 @@ class PlotWidget(QtWidgets.QWidget):
                               k=4.068,
                               x=self.x,
                               y=self.y)
-        self.save_to_file()
+        #self.save_to_file()
 
     def save_to_file(self):
         self.global_settings.beginGroup("DeviceParameters")
@@ -311,3 +312,66 @@ class PlotWidget(QtWidgets.QWidget):
         self.global_settings.setValue(f"ku_{sensor_num}", 4.068)
         self.global_settings.endGroup()
         self.close()
+
+class ImportCalibrationWidget(QtWidgets.QWidget):
+
+    def __init__(self, global_settings, *args, **kwargs):
+        super().__init__(*args, f=QtCore.Qt.Tool, **kwargs)
+        layout = QtWidgets.QHBoxLayout(self)
+        self.setWindowTitle("Import")
+        self.global_settings = global_settings
+        self.settings_widget = self.parent().settings_widget
+        self.import_button = QtWidgets.QPushButton("Import parameters of positions")
+        self.import_button.clicked.connect(self.import_parameters)
+        layout.addWidget(self.import_button)
+        layout.addStretch()
+
+    def import_parameters(self):
+        filename, filters = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Load parameters", "./tests", "Init files (*.ini)"
+        )
+        if not filename:
+            return
+        config = configparser.ConfigParser()
+
+        ded = 0
+        def deduplicate(x):
+            nonlocal ded
+            if x.lower() == "rn10_min":
+                ded = ded + 1
+                return x.lower() + str(ded)
+            else:
+                return x
+
+        config.optionxform = deduplicate
+        config.read(filename)
+
+        comport, sensor_number, multirange, machine_name, machine_id = self.settings_widget.get_variables()
+        not_added = []
+        for sens_num in range(sensor_number):
+            for idx_r4, r4 in enumerate(r4_str_values):
+                try:
+                    rs_u1 = config["Device parameters"][f"Rs_U1_{sens_num+1}_{idx_r4+1}"].replace(",", ".")
+                    rs_u2 = config["Device parameters"][f"Rs_U2_{sens_num+1}_{idx_r4+1}"].replace(",", ".")
+                except KeyError:
+                    not_added.append((sens_num, r4))
+                else:
+                    SensorPosition.create(machine=machine_id,
+                                  sensor_num=sens_num,
+                                  r4=r4,
+                                  rs_u1=float(rs_u1),
+                                  rs_u2=float(rs_u2),
+                                  k=4.068,
+                                  x=[],
+                                  y=[])
+        message_box = QtWidgets.QMessageBox()
+        if len(not_added) > 0:
+            text = "\n".join(f"{sens_num} {r4}"for sens_num, r4 in not_added)
+        else:
+            text = "Everything imported"
+        message_box.setText(text)
+        message_box.exec_()
+        self.settings_widget.redraw_signal.emit()
+
+    def toggle_visibility(self):
+        self.setVisible(not self.isVisible())

@@ -6,3 +6,5 @@ venv/
 .ycm_extra_conf.py
 icons/Thumbs*
 output/
+start.bat
+install_packages.bat
