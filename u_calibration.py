@@ -357,7 +357,7 @@ class ImportCalibrationWidget(QtWidgets.QWidget):
                     not_added.append((sens_num, r4))
                 else:
                     SensorPosition.create(machine=machine_id,
-                                  sensor_num=sens_num,
+                                  sensor_num=sens_num+1,
                                   r4=r4,
                                   rs_u1=float(rs_u1),
                                   rs_u2=float(rs_u2),
