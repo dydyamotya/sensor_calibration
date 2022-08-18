@@ -20,7 +20,7 @@ class EquipmentSettings(QtWidgets.QWidget):
     redraw_signal = QtCore.Signal(int)
 
     def __init__(self, global_settings, *args, **kwargs):
-        super().__init__(*args, f=QtCore.Qt.Tool | QtCore.Qt.WindowStaysOnTopHint, **kwargs)
+        super().__init__(*args, f=QtCore.Qt.Tool, **kwargs)
         layout = QtWidgets.QFormLayout()
         self.setLayout(layout)
         self.setWindowTitle("Settings")
@@ -83,7 +83,7 @@ class GasStateWidget(QtWidgets.QWidget):
     redraw_signal = QtCore.Signal(int)
 
     def __init__(self, global_settings, *args, **kwargs):
-        super().__init__(*args, f=QtCore.Qt.Tool | QtCore.Qt.WindowStaysOnTopHint, **kwargs)
+        super().__init__(*args, f=QtCore.Qt.Tool, **kwargs)
         layout = QtWidgets.QFormLayout()
         self.setLayout(layout)
         self.setWindowTitle("Settings")
@@ -131,13 +131,13 @@ def main():
 
     menu_bar = main_window.menuBar()
 
-    main_window.settings_widget = EquipmentSettings(settings)
+    main_window.settings_widget = EquipmentSettings(settings, main_window)
     logger.debug("After equipment setting init")
     action = QtWidgets.QAction("Settings", main_window)
     action.triggered.connect(main_window.settings_widget.toggle_visibility)
     menu_bar.addAction(action)
 
-    main_window.gasstate_widget = GasStateWidget(settings)
+    main_window.gasstate_widget = GasStateWidget(settings, main_window)
     logger.debug("After gasstate init")
     action = QtWidgets.QAction("GasState Server", main_window)
     action.triggered.connect(main_window.gasstate_widget.toggle_visibility)
