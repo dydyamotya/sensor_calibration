@@ -273,7 +273,6 @@ class OperationWidget(QtWidgets.QWidget):
         self.stop()
         self.plot_widget.set_sensor_number(sensor_number)
         self.lines_widget.set_number_of_sensors(sensor_number)
-        self.queue_runner.set_number_of_sensors(sensor_number)
         self.runner = None
         if self.generator is None:
             self.load_label.setText("Not loaded")
