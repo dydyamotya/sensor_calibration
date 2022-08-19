@@ -61,8 +61,11 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
     def _init_ui(self):
         machine_name = self.machine_name
         self._get_sensor_positions_from_db()
-        main_layout = QtWidgets.QHBoxLayout(self)
+        main_layout = QtWidgets.QVBoxLayout(self)
         self.tab_wid = QtWidgets.QTabWidget()
+        self.working_sensor = QtWidgets.QCheckBox("Working")
+        self.working_sensor.stateChanged.connect(self.change_color)
+        main_layout.addWidget(self.working_sensor)
         main_layout.addWidget(self.tab_wid)
         wid1 = QtWidgets.QWidget()
         wid2 = QtWidgets.QWidget()
@@ -75,8 +78,6 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
         main_layout.addLayout(layout, 1)
         main_layout.addLayout(layout2, 1)
         self.current_values_layout_labels = {label: QtWidgets.QLabel() for label in ("U:", "Rn:", "Rs:", "Mode:", "T:")}
-        self.working_sensor = QtWidgets.QCheckBox("Working")
-        self.working_sensor.stateChanged.connect(self.change_color)
 
         for label, widget in self.current_values_layout_labels.items():
             widget.setFrameStyle(QFrame.Panel)
@@ -88,7 +89,6 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
 
 
         if self.sensor_positions is None or len(self.sensor_positions) == 0:
-            layout.addWidget(self.working_sensor)
             layout.addWidget(QtWidgets.QLabel("No data"))
         else:
             r4s = [
@@ -110,7 +110,6 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
             buttons_layout = QtWidgets.QHBoxLayout()
             layout.addLayout(buttons_layout, stretch=0)
 
-            buttons_layout.addWidget(self.working_sensor)
 
             sensor_position_layout = QtWidgets.QFormLayout()
             layout.addLayout(sensor_position_layout, stretch=1)
