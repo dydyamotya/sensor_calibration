@@ -3,6 +3,8 @@ import configparser
 from PySide2 import QtWidgets, QtCore
 import argparse
 import logging
+
+from plotter import ExperimentPlotter
 from u_calibration import UCalibrationWidget, ImportCalibrationWidget
 from calibration import CalibrationWidget
 from measurement import MeasurementWidget
@@ -151,6 +153,12 @@ def main():
     action = QtWidgets.QAction("Import", main_window)
     action.triggered.connect(main_window.import_widget.toggle_visibility)
     menu_bar.addAction(action)
+
+    plotter_menu = menu_bar.addMenu("Plotter")
+    main_window.plotter_experiment_widget = ExperimentPlotter(main_window)
+    action = QtWidgets.QAction("Experiment plotter", main_window)
+    action.triggered.connect(main_window.plotter_experiment_widget.toggle_visibility)
+    plotter_menu.addAction(action)
 
     central_widget = QtWidgets.QTabWidget()
     main_window.setCentralWidget(central_widget)
