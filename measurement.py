@@ -33,6 +33,7 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
         self.sensor_num = sensor_num
         self.machine_name = machine_name
         self.temperatures_loaded = False
+        self.py_parent = parent
         self.resistances_convertors_loaded = False
         self.setTitle(f"Sensor {sensor_num + 1}")
         self._init_ui()
@@ -61,18 +62,30 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
         machine_name = self.machine_name
         self._get_sensor_positions_from_db()
         main_layout = QtWidgets.QHBoxLayout(self)
-        layout = QtWidgets.QVBoxLayout()
+        self.tab_wid = QtWidgets.QTabWidget()
+        main_layout.addWidget(self.tab_wid)
+        wid1 = QtWidgets.QWidget()
+        wid2 = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(wid1)
+        layout2_main = QtWidgets.QVBoxLayout(wid2)
         layout2 = QtWidgets.QFormLayout()
+        layout2_main.addLayout(layout2)
+        self.tab_wid.addTab(wid2, "Operation")
+        self.tab_wid.addTab(wid1, "DB")
         main_layout.addLayout(layout, 1)
         main_layout.addLayout(layout2, 1)
         self.current_values_layout_labels = {label: QtWidgets.QLabel() for label in ("U:", "Rn:", "Rs:", "Mode:", "T:")}
         self.working_sensor = QtWidgets.QCheckBox("Working")
         self.working_sensor.stateChanged.connect(self.change_color)
+
         for label, widget in self.current_values_layout_labels.items():
             widget.setFrameStyle(QFrame.Panel)
             widget.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse | QtCore.Qt.TextSelectableByKeyboard)
             widget.setStyleSheet("background-color:pink")
             layout2.addRow(label, widget)
+        self.u_set_lineedit = QtWidgets.QLineEdit()
+        layout2.addRow("Set U", self.u_set_lineedit)
+
 
         if self.sensor_positions is None or len(self.sensor_positions) == 0:
             layout.addWidget(self.working_sensor)
@@ -81,8 +94,8 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
             r4s = [
                 sensor_position.r4 for sensor_position in self.sensor_positions
             ]
-
-            positions_r4s_combobox = QtWidgets.QComboBox()
+            self.r4_positions = QtWidgets.QComboBox()
+            positions_r4s_combobox = self.r4_positions
             if self.resistances_convertors_loaded and len(self.sensor_positions) == 3:
                 positions_r4s_combobox.setStyleSheet("background-color:palegreen")
             elif self.resistances_convertors_loaded and len(self.sensor_positions) < 3:
@@ -255,6 +268,11 @@ class MeasurementWidget(QtWidgets.QWidget):
         self.load_status_label.setStyleSheet("background-color:pink")
         buttons_layout.addWidget(load_calibration_button)
         buttons_layout.addWidget(self.load_status_label)
+
+        self.send_u_button = QtWidgets.QPushButton("Send U to sensors")
+        self.send_u_button.clicked.connect(self.send_us)
+        buttons_layout.addWidget(self.send_u_button)
+
         buttons_layout.addStretch()
 
         self.css_boxes = CssCheckBoxes()
@@ -325,3 +343,41 @@ class MeasurementWidget(QtWidgets.QWidget):
 
     def get_working_widgets(self):
         return [widget.working_sensor.isChecked() for widget in self.widgets]
+
+    def send_us(self):
+        values = []
+        current_states = []
+        for widget in self.widgets:
+            try:
+                value = float(widget.u_set_lineedit.text())
+            except ValueError:
+                values.append(0)
+            else:
+                values.append(value)
+            try:
+                index = widget.r4_positions.currentIndex() + 1
+            except:
+                current_states.append(3)
+            else:
+                current_states.append(index)
+        logger.debug(f"{values}, {current_states}")
+        try:
+            ms = self.settings_widget.get_new_ms()
+        except:
+            mess_box = QtWidgets.QMessageBox()
+            mess_box.setText("Port doesn't exist")
+            mess_box.exec_()
+        else:
+            ms.send_measurement_range(current_states)
+            sensor_types_list = self.get_sensor_types_list()
+            us, rs = ms.full_request(values, request_type=MS_ABC.REQUEST_U,
+                                     sensor_types_list=sensor_types_list)
+            for widget, u, r, mode in zip(self.widgets, us ,rs, current_states):
+                funcs = widget.get_voltage_to_resistance_funcs()
+                sr = funcs[mode](u)
+                widget.set_labels(u, r, sr, mode, 0)
+
+
+    def set_labels(self, u, r, sr, mode, temperature):
+        for value, widget in zip((u, r, sr, mode, temperature), self.current_values_layout_labels.values()):
+            widget.setText(str(value))

@@ -228,7 +228,7 @@ class OperationWidget(QtWidgets.QWidget):
         self.lines_widget = LinesDrawButton(self.plot_widget, self)
         self.lines_widget.set_number_of_sensors(sensor_number)
 
-        layout1.addStretch()
+        layout1.addStretch(1)
 
         plot_options_groupbox = QtWidgets.QGroupBox()
         plot_options_groupbox.setTitle("Plot options")
@@ -592,3 +592,4 @@ class AnswerPlotWidget(pg.PlotWidget):
                     self.rs[:, :self.drawing_index]):
                 plot_item.setData(x=self.times[:self.drawing_index], y=us_line)
             logger.debug(f'End plotting data, drawing_index = {self.drawing_index}')
+

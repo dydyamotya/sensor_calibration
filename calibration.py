@@ -58,8 +58,12 @@ class CalibrationWidget(QtWidgets.QWidget):
         self.calibration_settings = CalibrationSettings(self)
         self.cal_plot_widget = CalibrationPlotWidget(self)
         self.cal_buttons = CalibrationButtons(self)
+
+        scroll_per_sensor = QtWidgets.QScrollArea()
+        scroll_per_sensor.setWidgetResizable(True)
         self.per_sensor = PerSensorSettings(self)
         self.per_sensor.connect_return_pressed(self.recalc_signal_handler)
+        scroll_per_sensor.setWidget(self.per_sensor)
         self.r0_voltage = TypeCheckLineEdit(self, float, 0.3)
         self.save_buttons = SaveButtons(self)
         self.css_checkboxes = CssCheckBoxes(self)
@@ -81,7 +85,7 @@ class CalibrationWidget(QtWidgets.QWidget):
 
         left_layout.addLayout(settings_layout_hbox)
 
-        left_layout.addWidget(self.per_sensor)
+        left_layout.addWidget(scroll_per_sensor)
         left_layout.addWidget(self.save_buttons)
 
         layout.addWidget(self.cal_plot_widget)
@@ -467,7 +471,7 @@ class CalibrationSettings(QtWidgets.QWidget):
         ]
 
         self.widget_types = [float, int, float, float, int, float]
-        self.widget_defaults = [0.1, 10, 5.1, 2.0, 1, 0.01]
+        self.widget_defaults = [0.1, 10, 5.0, 2.0, 1, 0.01]
         self.entries = [
             TypeCheckLineEdit(self, type_, default_value)
             for widget_name, type_, default_value in zip(
@@ -496,6 +500,7 @@ class CalibrationPlotWidget(QtWidgets.QWidget):
 
         ax.set_xlabel("Voltage, V")
         ax.set_ylabel("Temperature, C")
+        ax.grid()
 
         self.lines_dict = {
             i: Line2D([], [], color=color) for i, color in enumerate(colors_for_lines)
