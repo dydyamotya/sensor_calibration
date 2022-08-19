@@ -355,7 +355,7 @@ class MeasurementWidget(QtWidgets.QWidget):
             else:
                 values.append(value)
             try:
-                index = widget.r4_positions.currentIndex() + 1
+                index = r4_str_values.index(widget.r4_positions.currentText()) + 1
             except:
                 current_states.append(3)
             else:
