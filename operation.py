@@ -72,6 +72,7 @@ class QueueRunner():
         self.thread = None
         self.hold_method = None
         self.stopped = True
+        self.sensor_number = 12
         self.filename = None
         self.converter_funcs_dicts = converters_func_voltage_to_r
         self._meas_values_tuple = None
@@ -86,6 +87,9 @@ class QueueRunner():
     def get_meas_tuple(self):
         with self.meas_tuple_lock:
             return self._meas_values_tuple
+
+    def set_number_of_sensors(self, value):
+        self.sensor_number = value
 
     def set_meas_tuple(self, values):
         with self.meas_tuple_lock:
@@ -133,14 +137,14 @@ class QueueRunner():
                     converter_func_dict[sensor_state](u) for converter_func_dict, u, sensor_state in
                     zip(converter_funcs, us, sensor_states))
                 logger.debug(f"Call in cycle")
-                self.set_meas_tuple((us, rs, sensor_resistances, sensor_states, temperatures))
+                self.set_meas_tuple((us, rs, sensor_resistances, sensor_states, temperatures[:self.sensor_number]))
                 self.hold_method((sensor_resistances, rs, time_next))
                 if not headed:
                     header_comment, header = form_header(len(rs))
                     csvwriter.writerow(header_comment)
                     csvwriter.writerow(header)
                     headed = True
-                csvwriter.writerow((time_next, *us, *rs, *sensor_resistances, *temperatures, gas_state, stage_num,
+                csvwriter.writerow((time_next, *us, *rs, *sensor_resistances, *temperatures[:self.sensor_number], gas_state, stage_num,
                                     stage_type, *sensor_states))
         while not self.queue.empty():
             data = self.queue.get()
@@ -273,6 +277,7 @@ class OperationWidget(QtWidgets.QWidget):
         self.stop()
         self.plot_widget.set_sensor_number(sensor_number)
         self.lines_widget.set_number_of_sensors(sensor_number)
+        self.queue_runner.set_number_of_sensors(sensor_number)
         self.runner = None
         if self.generator is None:
             self.load_label.setText("Not loaded")

@@ -83,15 +83,13 @@ class ProgramGenerator:
         stage_num = ProgramGenerator.get_stage_number()
         step = settings.step
         gas_state = stage.gas_state
-        stage_type = stage.type
         temperatures = ProgramGenerator.convert_temperatures(stage.temperature)
         for _ in np.arange(0, stage.time, step):
-            yield temperatures, gas_state, stage_num, stage_type
+            yield temperatures, gas_state, stage_num, 0
 
     @staticmethod
     def _process_stepwise(stage, settings):
         step = settings.step
-        stage_type = stage.type
         temperature_step = -stage.temperature_step if stage.temperature_start > stage.temperature_stop else stage.temperature_step
         for temperature in np.arange(stage.temperature_start, stage.temperature_stop, temperature_step):
             converted_temperatures = ProgramGenerator.convert_temperatures(temperature)
@@ -99,7 +97,7 @@ class ProgramGenerator:
                 for gas_state in stage.gas_states:
                     stage_num = ProgramGenerator.get_stage_number()
                     for _ in np.arange(0, stage.time, step):
-                        yield converted_temperatures, gas_state, stage_num, stage_type
+                        yield converted_temperatures, gas_state, stage_num, 1
 
     @staticmethod
     def _process_cyclic(stage, settings):
@@ -107,10 +105,9 @@ class ProgramGenerator:
         temperatures = stage.temperatures
         func = interp1d(temperatures.time, temperatures.temperature)
         max_time = max(temperatures.time)
-        stage_type = stage.type
         for gas_state, _ in zip(itertools.cycle(ProgramGenerator.process_gas_states_cycle(stage.gas_states)), range(stage.repeat)):
             gas_get_func = ProgramGenerator.process_gas_state(gas_state, max_time)
             stage_num = ProgramGenerator.get_stage_number()
             for inter_time in np.arange(0, max_time, step):
-                yield ProgramGenerator.convert_temperatures(float(func(inter_time))), gas_get_func(inter_time), stage_num, stage_type
+                yield ProgramGenerator.convert_temperatures(float(func(inter_time))), gas_get_func(inter_time), stage_num, 2
 
