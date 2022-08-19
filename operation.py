@@ -72,7 +72,6 @@ class QueueRunner():
         self.thread = None
         self.hold_method = None
         self.stopped = True
-        self.sensor_number = 12
         self.filename = None
         self.converter_funcs_dicts = converters_func_voltage_to_r
         self._meas_values_tuple = None
@@ -87,9 +86,6 @@ class QueueRunner():
     def get_meas_tuple(self):
         with self.meas_tuple_lock:
             return self._meas_values_tuple
-
-    def set_number_of_sensors(self, value):
-        self.sensor_number = value
 
     def set_meas_tuple(self, values):
         with self.meas_tuple_lock:
@@ -137,14 +133,14 @@ class QueueRunner():
                     converter_func_dict[sensor_state](u) for converter_func_dict, u, sensor_state in
                     zip(converter_funcs, us, sensor_states))
                 logger.debug(f"Call in cycle")
-                self.set_meas_tuple((us, rs, sensor_resistances, sensor_states, temperatures[:self.sensor_number]))
+                self.set_meas_tuple((us, rs, sensor_resistances, sensor_states, temperatures))
                 self.hold_method((sensor_resistances, rs, time_next))
                 if not headed:
                     header_comment, header = form_header(len(rs))
                     csvwriter.writerow(header_comment)
                     csvwriter.writerow(header)
                     headed = True
-                csvwriter.writerow((time_next, *us, *rs, *sensor_resistances, *temperatures[:self.sensor_number], gas_state, stage_num,
+                csvwriter.writerow((time_next, *us, *rs, *sensor_resistances, *temperatures, gas_state, stage_num,
                                     stage_type, *sensor_states))
         while not self.queue.empty():
             data = self.queue.get()
@@ -301,7 +297,8 @@ class OperationWidget(QtWidgets.QWidget):
                 self.gasstate_widget.send_state,
                 self.get_checkbox_state,
                 self.queue,
-                self.stop_signal, self.running_signal)
+                self.stop_signal, self.running_signal,
+                sensor_number)
             self.plot_widget.clear_plot()
             self.runner.start()
             self.queue_runner.start()
@@ -377,7 +374,8 @@ class ProgramRunner:
                  checkbox_state,
                  queue,
                  stop_signal,
-                 running_signal):
+                 running_signal,
+                 sensor_number):
         self.stopped = True
         self.stop_signal = stop_signal
         self.running_signal = running_signal
@@ -390,6 +388,7 @@ class ProgramRunner:
         self.multirange: bool = multirange
         self.send_gasstate_func = send_gasstate_func
         self.checkbox_state = checkbox_state
+        self.sensor_number = sensor_number
         self.thread = None
         self.queue = queue
 
@@ -412,13 +411,13 @@ class ProgramRunner:
         sensor_types_list = self.get_sensor_types_list()
         sensor_states = [
                             1,
-                        ] * 12
+                        ] * self.sensor_number
         sensor_stab_up_states = [
                                     True,
-                                ] * 12
+                                ] * self.sensor_number
         sensor_stab_down_states = [
                                       True,
-                                  ] * 12
+                                  ] * self.sensor_number
         while not self.stopped:
             try:
                 time_next, (temperatures, gas_state, stage_num,
@@ -428,6 +427,7 @@ class ProgramRunner:
                 self.stopped = True
             else:
                 self.running_signal.emit()
+                temperatures = temperatures[:self.sensor_number]
                 time_next_plus_t0 = time_0 + time_next
                 while time() < time_next_plus_t0:
                     sleep(time_sleep)
