@@ -232,8 +232,15 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
         return funcs_dict
 
     def set_labels(self, u, r, sr, mode, temperature):
-        for value, widget in zip((u, r, sr, mode, temperature), self.current_values_layout_labels.values()):
-            widget.setText(str(value))
+        if u == sr:
+            for value, widget in zip((u, r, sr, mode, temperature), self.current_values_layout_labels.values()):
+                widget.setText(str(value))
+        else:
+            for value, widget_key in zip((u, r, sr, mode, temperature), self.current_values_layout_labels.keys()):
+                if widget_key != "Rs:":
+                    self.current_values_layout_labels[widget_key].setText(str(value))
+                else:
+                    self.current_values_layout_labels[widget_key].setText(f"{value:1.5e}")
 
 
 class MeasurementWidget(QtWidgets.QWidget):
