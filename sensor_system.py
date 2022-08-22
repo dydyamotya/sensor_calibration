@@ -196,6 +196,7 @@ class MS12(MS_ABC):
             raise MS_ABC.MSException(f"Wrong request_type arg, with value {request_type}")
         send_key = self._form_send_key(send_key, sensor_types_list)
         message = self.BEGIN_KEY + send_key + functools.reduce(operator.add, (convert_func(number) for number in values)) + bytes(8) + self.END_KEY
+        logger.debug(str(message))
         return self.ser.write(message)
 
     def _send_test(self):
@@ -229,6 +230,7 @@ class MS4(MS_ABC):
             raise MS_ABC.MSException(f"Wrong request_type arg, with value {request_type}")
         send_key = self._form_send_key(send_key, sensor_types_list)
         message = self.BEGIN_KEY + send_key + functools.reduce(operator.add, (convert_func(number) for number in values)) + self.END_KEY
+        logger.debug(str(message))
         return self.ser.write(message)
 
     def _send_test(self, *args, **kwargs):
