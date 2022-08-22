@@ -171,9 +171,18 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
             logger.debug(
                 f"Calibration T_to_U successful for {self.sensor_num} {self.machine_name} sensor"
             )
-
-        res = linregress(self.temperatures, self.resistances)
-        self.func_T_to_R = lambda x: res.intercept + res.slope * x
+        try:
+            res = linregress(self.temperatures, self.resistances)
+        except ValueError:
+            logger.debug(
+                f"Calibration T_to_R loading failed for {self.sensor_num} {self.machine_name} sensor"
+            )
+            self.func_T_to_R = lambda x: 0
+        else:
+            self.func_T_to_R = lambda x: res.intercept + res.slope * x
+            logger.debug(
+                f"Calibration T_to_R successful for {self.sensor_num} {self.machine_name} sensor"
+            )
 
         self.temperatures_loaded = True
         self.change_color()
