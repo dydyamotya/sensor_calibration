@@ -459,9 +459,8 @@ class ProgramRunner:
                                         sensor_stab_down_states)
         self.clear_ms_state(ms)
 
-    @staticmethod
-    def clear_ms_state(ms: MS_Uni):
-        ms.clear_state()
+    def clear_ms_state(self, ms: MS_Uni):
+        ms.clear_state(self.get_sensor_types_list())
         ms.close()
 
     def convert_to_resistances(self, temperatures):

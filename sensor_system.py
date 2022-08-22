@@ -289,8 +289,8 @@ class MS_Uni():
             sensor_types_list = []
         return self.ms.full_request(values[:self.sensors_number], request_type, sensor_types_list)
 
-    def clear_state(self):
-        self.full_request([0,] * self.ms.sensors_number)
+    def clear_state(self, sensor_types_list=None):
+        self.full_request([0,] * self.ms.sensors_number, sensor_types_list=sensor_types_list)
 
     def close(self):
         self.ms.close()
