@@ -39,11 +39,18 @@ class DatabaseLeaderComboboxWidget(QtWidgets.QComboBox):
         return self.currentText()
 
     def get_id(self):
-        return getattr(self.model.get(getattr(self.model, self.key) == self.currentText()), "id")
+        try:
+            to_return = getattr(self.model.get(getattr(self.model, self.key) == self.currentText()), "id")
+        except:
+            self.set_new_value("Default")
+            return getattr(self.model.get(getattr(self.model, self.key) == self.currentText()), "id")
+        else:
+            return to_return
 
 
 class DatabaseNonleaderComboboxWidget(QtWidgets.QComboBox):
-    def __init__(self, leader_widget: DatabaseLeaderComboboxWidget, key: str, keys: typing.Sequence, values: typing.Sequence,  *args, **kwargs):
+    def __init__(self, leader_widget: DatabaseLeaderComboboxWidget, key: str, keys: typing.Sequence,
+                 values: typing.Sequence, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.leader_widget = leader_widget
         self.model = leader_widget.model
