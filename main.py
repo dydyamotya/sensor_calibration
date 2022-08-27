@@ -105,6 +105,7 @@ class GasStateWidget(QtWidgets.QWidget):
     def send_state(self, state_num: int):
         if state_num != self.prev_gas_state:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(0.001)
             ip, port = self.gas_state_server_address.text().split(":")
             s.connect((ip, int(port)))
             s.send(str(state_num).encode("utf-8"))

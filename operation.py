@@ -64,6 +64,7 @@ class LinesDrawButton(QtWidgets.QPushButton):
         for idx, (label, pixmap) in enumerate(zip(self.labels, self.pixmaps)):
             label.setVisible(idx < number)
             pixmap.setVisible(idx < number)
+            pixmap.set_true()
 
 
 class QueueRunner():
@@ -531,12 +532,14 @@ class AnswerPlotWidget(pg.PlotWidget):
             line.setShadowPen(pg.mkPen(pg.mkColor("#666666"), width=8))
             self.emphasized_lines.append(line)
 
-    def set_visible_invisible(self, index):
+    def set_visible_invisible(self, index, state):
         line = self.plot_data_items[index]
         if line in self.vboxitem.addedItems:
-            self.vboxitem.removeItem(line)
+            if not state:
+                self.vboxitem.removeItem(line)
         else:
-            self.vboxitem.addItem(line)
+            if state:
+                self.vboxitem.addItem(line)
 
     def set_visible(self, index):
         line = self.plot_data_items[index]

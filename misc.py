@@ -17,7 +17,7 @@ class Lamp(QtWidgets.QLabel):
         self.setPixmap(self.stop_pixmap)
 
 class ClickableLabel(QtWidgets.QLabel):
-    clicked = Signal(int)
+    clicked = Signal(int, bool)
 
     def __init__(self, num,  *args, **kwargs):
         super(ClickableLabel, self).__init__(*args, **kwargs)
@@ -31,7 +31,11 @@ class ClickableLabel(QtWidgets.QLabel):
         else:
             self.setStyleSheet("border-style:outset; border-width:4px; border-color:black;")
         self.state = not self.state
-        self.clicked.emit(self.num)
+        self.clicked.emit(self.num, self.state)
+
+    def set_true(self):
+        self.state = True
+        self.setStyleSheet("border-style:outset; border-width:4px; border-color:black;")
 
     def click(self):
         self.mousePressEvent(None)
