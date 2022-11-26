@@ -1,6 +1,7 @@
 from PySide2 import QtWidgets, QtCore
 import pyqtgraph as pg
 import numpy as np
+import pandas as pd
 
 colors_for_lines = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22',
                     '#17becf', "#DDDDDD", "#00FF00"]
@@ -49,16 +50,11 @@ class ExperimentPlotter(QtWidgets.QWidget):
         )
         if not filename:
             return
-        with open(filename, "r") as fd:
-            data = np.loadtxt(fd, delimiter="\t", skiprows=2)
+        data = pd.read_csv(filename, delimiter="\t", index_col=0, skiprows=1)
         self.legend_item.clear()
         self.plot_widget.getPlotItem().clear()
-        if data.shape[1] == 24:
-            for i, color in enumerate(colors_for_lines[:4]):
-                plot_data_item = self.plot_widget.plot(x=data[:, 0], y=data[:, 9+i], pen=pg.mkPen(pg.mkColor(color), width=2))
-                self.legend_item.addItem(plot_data_item, f"Sensor {i + 1}")
-        elif data.shape[1] == 64:
-            for i, color in enumerate(colors_for_lines):
-                plot_data_item = self.plot_widget.plot(x=data[:, 0], y=data[:, 25+i], pen=pg.mkPen(pg.mkColor(color), width=2))
-                self.legend_item.addItem(plot_data_item, f"Sensor {i + 1}")
+        number_of_sensors = len(tuple(col for col in data.columns if col.startswith("State")))
+        for i, (sensor_idx, color) in enumerate(zip(range(number_of_sensors), colors_for_lines)):
+            plot_data_item = self.plot_widget.plot(x=data.index, y=data[f"Rs{sensor_idx}"], pen=pg.mkPen(pg.mkColor(color), width=2))
+            self.legend_item.addItem(plot_data_item, f"Sensor {i + 1}")
 
