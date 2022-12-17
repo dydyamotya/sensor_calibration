@@ -82,6 +82,9 @@ class EquipmentSettings(QtWidgets.QWidget):
         if self.isVisible():
             self.comport_widget.refresh_values(comports_list(), comports_list())
 
+    def keyReleaseEvent(self, event):
+        if event.key() == QtCore.Qt.Key_Escape:
+            self.close()
 
 class GasStateWidget(QtWidgets.QWidget):
     redraw_signal = QtCore.Signal(int)
@@ -118,6 +121,10 @@ class GasStateWidget(QtWidgets.QWidget):
 
     def toggle_visibility(self):
         self.setVisible(not self.isVisible())
+
+    def keyReleaseEvent(self, event):
+        if event.key() == QtCore.Qt.Key_Escape:
+            self.close()
 
 
 
