@@ -6,11 +6,8 @@ from sensor_system import MS_Uni, MS_ABC
 from misc import TypeCheckLineEdit, clear_layout, CssCheckBoxes
 import time
 import configparser
+import pyqtgraph as pg
 
-from matplotlib import figure
-from matplotlib.lines import Line2D
-from matplotlib.colors import get_named_colors_mapping
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 import numpy as np
 import numpy.ma as ma
 
@@ -18,20 +15,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-colors_for_lines = (
-    "tab:blue",
-    "tab:orange",
-    "tab:green",
-    "tab:red",
-    "tab:purple",
-    "tab:brown",
-    "tab:pink",
-    "tab:gray",
-    "tab:olive",
-    "tab:cyan",
-    "black",
-    "lime",
-)
+colors_for_lines = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22',
+                    '#17becf', "#DDDDDD", "#00FF00"]
 
 values_for_css_boxes = [MS_ABC.SEND_CSS_1_4,
                         MS_ABC.SEND_CSS_5_8, MS_ABC.SEND_CSS_9_12]
@@ -401,7 +386,7 @@ class OneSensorWidget(QtWidgets.QWidget):
         layout.addWidget(self.alpha)
 
         pixmap = QPixmap(20, 20)
-        color = QColor(get_named_colors_mapping()[colors_for_lines[number]])
+        color = QColor(colors_for_lines[number])
         pixmap.fill(color)
         pixmap_label = QtWidgets.QLabel(self)
         pixmap_label.setPixmap(pixmap)
@@ -486,40 +471,34 @@ class CalibrationSettings(QtWidgets.QWidget):
             yield entry.get_value()
 
 
-class CalibrationPlotWidget(QtWidgets.QWidget):
-    def __init__(self, parent):
-        super().__init__(parent)
-        fig = figure.Figure()
-        ax = fig.add_subplot(1, 1, 1)
-        self.canvas = FigureCanvasQTAgg(figure=fig)
-        layout = QtWidgets.QVBoxLayout()
-        self.setLayout(layout)
-        layout.addWidget(self.canvas)
-        toolbox = NavigationToolbar2QT(self.canvas, self)
-        layout.addWidget(toolbox)
+class CalibrationPlotWidget(pg.PlotWidget):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.legend = pg.LegendItem(offset=(-10, 10), labelTextColor=pg.mkColor("#FFFFFF"),
+                                    brush=pg.mkBrush(pg.mkColor("#111111")))
+        plot_item = self.getPlotItem()
+        plot_item.disableAutoRange()
+        plot_item.setXRange(-0.2, 5.2)
+        plot_item.setYRange(-20, 520)
 
-        ax.set_xlabel("Voltage, V")
-        ax.set_ylabel("Temperature, C")
-        ax.grid()
+        self.legend.setParentItem(plot_item)
+        plot_item.showGrid(x=True, y=True)
+        plot_item.setLabel("bottom", "Voltage", units="V")
+        plot_item.setLabel("left", "Temperature", units="C")
 
-        self.lines_dict = {
-            i: Line2D([], [], color=color) for i, color in enumerate(colors_for_lines)
-        }
-
-        for line in self.lines_dict.values():
-            ax.add_line(line)
-
-        ax.set_ylim(-20, 520)
-        ax.set_xlim(-0.2, 5.2)
+        self.plot_data_items = [
+            self.plot([0], [0], name=f"Sensor {i + 1}") for i in range(len(colors_for_lines))
+        ]
+        for idx, (plot_data_item, color) in enumerate(zip(self.plot_data_items, colors_for_lines)):
+            plot_data_item.setPen(pg.mkPen(pg.mkColor(color), width=2))
+            plot_data_item.setCurveClickable(True)
+            self.legend.addItem(plot_data_item, f"Sensor {idx + 1}")
 
     def set_lines(self, voltages, temperatures):
-        for line, voltage_row, temperature_row in zip(
-            self.lines_dict.values(), voltages, temperatures
+        for plot_item, voltage_row, temperature_row in zip(
+                self.plot_data_items, voltages, temperatures
         ):
-            line.set_xdata(voltage_row)
-            line.set_ydata(temperature_row)
-        self.canvas.draw()
-
+            plot_item.setData(x=voltage_row, y=temperature_row)
 
 class SaveButtons(QtWidgets.QWidget):
     def __init__(self, parent):

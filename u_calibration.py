@@ -10,8 +10,7 @@ from sensor_system import MS_Uni
 
 from PySide2 import QtWidgets, QtCore, QtGui
 import logging
-from matplotlib import figure
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
+import pyqtgraph as pg
 from models import SensorPosition
 
 logger = logging.getLogger(__name__)
@@ -266,17 +265,14 @@ class PlotWidget(QtWidgets.QWidget):
         self.y = y
         self.popt = popt
 
-        fig = figure.Figure()
-        ax = fig.add_subplot(2, 1, 1)
-        ax2 = fig.add_subplot(2, 1, 2, sharex=ax)
-        canvas = FigureCanvasQTAgg(figure=fig)
+        gl_widget = pg.GraphicsLayoutWidget()
+        p1 = gl_widget.addPlot()
+        gl_widget.nextRow()
+        p2 = gl_widget.addPlot()
 
         layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
-        layout.addWidget(canvas)
-
-        toolbox = NavigationToolbar2QT(canvas, self)
-        layout.addWidget(toolbox)
+        layout.addWidget(gl_widget)
 
         buttons_layout = QtWidgets.QHBoxLayout()
         layout.addLayout(buttons_layout)
@@ -289,16 +285,15 @@ class PlotWidget(QtWidgets.QWidget):
         buttons_layout.addWidget(cancel_button)
         cancel_button.clicked.connect(self.close)
 
-        ax.set_yscale("log")
-        ax.set_xlabel("Voltage, V")
-        ax.set_ylabel("log(R)")
+        p1.setLogMode(y=True)
+        p1.setLabel("bottom", "Voltage, V")
+        p1.setLabel("left", "log(R)")
         self.setWindowTitle("Visualization of regression")
-        ax.scatter(x, y)
+        p1.plot(x, y, symbol="o", pen=None)
         linspace = np.linspace(0, 5, num=10000)
-        ax.plot(linspace, func(linspace, *popt))
-        ax2.plot(x, np.abs((y - func(np.array(x), *popt)) / y), marker=".")
-        fig.tight_layout()
-        canvas.draw()
+        p1.plot(linspace, func(linspace, *popt))
+        p2.setXLink(p1)
+        p2.plot(x, np.abs((y - func(np.array(x), *popt)) / y), symbol="o")
         self.show()
 
     def keyReleaseEvent(self, event):

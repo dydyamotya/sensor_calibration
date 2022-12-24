@@ -9,8 +9,6 @@ from sensor_system import MS_ABC
 
 from PySide2 import QtWidgets, QtCore, QtGui
 import logging
-from matplotlib import figure
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
 from models import SensorPosition, fn, Machine
 from misc import clear_layout, CssCheckBoxes
 

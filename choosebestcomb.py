@@ -88,8 +88,8 @@ class ChooseBestCombinationOfSensorsWidget(QtWidgets.QWidget):
         main_layout.addLayout(parameters_layout)
 
 
-        self.alpha_widget = QtWidgets.QLineEdit()
-        self.beta_widget = QtWidgets.QLineEdit()
+        self.alpha_widget = QtWidgets.QLineEdit("1")
+        self.beta_widget = QtWidgets.QLineEdit("0.0001")
         parameters_layout.addWidget(QtWidgets.QLabel("Alpha:"))
         parameters_layout.addWidget(self.alpha_widget)
         parameters_layout.addWidget(QtWidgets.QLabel("Beta:"))
