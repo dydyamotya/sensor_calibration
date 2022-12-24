@@ -4,6 +4,7 @@ from PySide2 import QtWidgets, QtCore
 import argparse
 import logging
 
+from choosebestcomb import ChooseBestCombinationOfSensorsWidget
 from plotter import ExperimentPlotter
 from u_calibration import UCalibrationWidget, ImportCalibrationWidget
 from calibration import CalibrationWidget
@@ -182,6 +183,9 @@ def main():
 
     window = UCalibrationWidget(main_window, level, settings)
     central_widget.addTab(window, "Sensor calibration")
+
+    window = ChooseBestCombinationOfSensorsWidget(main_window, level, settings)
+    central_widget.addTab(window, "Choose best sensors")
 
     main_window.show()
 
