@@ -34,7 +34,7 @@ class CalibrationWidget(QtWidgets.QWidget):
         self.stopped = True
         self.ms = None
         self.thread = None
-        self.last_idx = -1
+        self.last_idx = 0
 
         layout = QtWidgets.QHBoxLayout(self)
 
@@ -203,7 +203,7 @@ class CalibrationWidget(QtWidgets.QWidget):
                 break
         self.full_request_until_result((0,) * self.sensor_number)
         self.stopped = True
-        self.last_idx = -1
+        self.last_idx = all_steps
         self.ms.close()
         self.ms = None
 
@@ -252,7 +252,7 @@ class CalibrationWidget(QtWidgets.QWidget):
         return voltages, resistances, temperatures
 
     def load_data(self, voltages, resistances):
-        self.last_idx = -1
+        self.last_idx = voltages.shape[1]
         self.voltages = voltages
         self.resistances = resistances
 
