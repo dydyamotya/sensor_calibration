@@ -18,9 +18,9 @@ values_for_css_boxes = [
     MS_ABC.SEND_CSS_1_4, MS_ABC.SEND_CSS_5_8, MS_ABC.SEND_CSS_9_12
 ]
 
-r4_str_values = ["100 kOhm", "1.1 MOhm", "11.1 MOhm"]
+r4_str_values = ["100 kOhm", "1.1 MOhm", "101.1 MOhm"]
 r4_to_int = dict(zip(r4_str_values, range(1, 4)))
-r4_to_float = dict(zip(r4_str_values, (1e5, 1.1e6, 1.11e7)))
+r4_to_float = dict(zip(r4_str_values, (1e5, 1.1e6, 1.011e8)))
 
 
 class SensorPositionWidget(QtWidgets.QGroupBox):
@@ -68,13 +68,9 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
         wid1 = QtWidgets.QWidget()
         wid2 = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(wid1)
-        layout2_main = QtWidgets.QVBoxLayout(wid2)
-        layout2 = QtWidgets.QFormLayout()
-        layout2_main.addLayout(layout2)
+        layout2 = QtWidgets.QFormLayout(wid2)
         self.tab_wid.addTab(wid2, "Operation")
         self.tab_wid.addTab(wid1, "DB")
-        main_layout.addLayout(layout, 1)
-        main_layout.addLayout(layout2, 1)
         self.current_values_layout_labels = {label: QtWidgets.QLabel() for label in ("U:", "Rn:", "Rs:", "Mode:", "T:")}
 
         for label, widget in self.current_values_layout_labels.items():

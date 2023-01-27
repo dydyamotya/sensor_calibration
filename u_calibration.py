@@ -33,7 +33,7 @@ class ResistanseDict(UserDict):
 
 rs = np.array([2.1e9, 5e8, 1e8, 1e7, 1e6, 1e5, 5.1e4, 1e4, 1e3])
 r4_str_values = ["100 kOhm", "1.1 MOhm", "11.1 MOhm"]
-r4_combobox_dict = ResistanseDict(zip(r4_str_values, (1e5, 1.1e6, 1.11e7)))
+r4_combobox_dict = ResistanseDict(zip(r4_str_values, (1e5, 1.1e6, 1.011e8)))
 r4_range_dict = dict(zip(r4_str_values, (1, 2, 3)))
 
 r_labels_str = tuple(map("{:1.2e}".format, rs))
