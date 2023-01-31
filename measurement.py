@@ -71,7 +71,7 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
         layout2 = QtWidgets.QFormLayout(wid2)
         self.tab_wid.addTab(wid2, "Operation")
         self.tab_wid.addTab(wid1, "DB")
-        self.current_values_layout_labels = {label: QtWidgets.QLabel() for label in ("U:", "Rn:", "Rs:", "Mode:", "T:")}
+        self.current_values_layout_labels = {label: QtWidgets.QLabel() for label in ("Us:", "Rn:", "Rs:", "T:", "Un:")}
 
         for label, widget in self.current_values_layout_labels.items():
             widget.setFrameStyle(QFrame.Panel)
@@ -234,12 +234,12 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
                 funcs_dict[r4_to_int[r4_str]] = lambda u: u
         return funcs_dict
 
-    def set_labels(self, u, r, sr, mode, temperature):
+    def set_labels(self, u, r, sr, mode, temperature, un=0):
         if u == sr:
-            for value, widget in zip((u, r, sr, mode, temperature), self.current_values_layout_labels.values()):
+            for value, widget in zip((u, r, sr, mode, temperature, un), self.current_values_layout_labels.values()):
                 widget.setText(str(value))
         else:
-            for value, widget_key in zip((u, r, sr, mode, temperature), self.current_values_layout_labels.keys()):
+            for value, widget_key in zip((u, r, sr, mode, temperature, un), self.current_values_layout_labels.keys()):
                 if widget_key != "Rs:":
                     self.current_values_layout_labels[widget_key].setText(str(value))
                 else:
@@ -281,6 +281,7 @@ class MeasurementWidget(QtWidgets.QWidget):
         self.send_u_button = QtWidgets.QPushButton("Send U to sensors")
         self.send_u_button.clicked.connect(self.send_us)
         buttons_layout.addWidget(self.send_u_button)
+
 
         buttons_layout.addStretch()
 
@@ -346,16 +347,17 @@ class MeasurementWidget(QtWidgets.QWidget):
     def get_voltage_to_resistance_funcs(self):
         return tuple(widget.get_voltage_to_resistance_funcs() for widget in self.widgets)
 
-    def set_results_values_to_widgets(self, us, rs, srs, modes, temperatures):
-        for u, r, sr, mode, temperature, widget in zip(us, rs, srs, modes, temperatures, self.widgets):
-            widget.set_labels(u, r, sr, mode, temperature)
+    def set_results_values_to_widgets(self, us, rs, srs, modes, temperatures, uns=None):
+        if uns is None:
+            uns = (0, ) * 12
+        for u, r, sr, mode, temperature, un, widget in zip(us, rs, srs, modes, temperatures, uns, self.widgets):
+            widget.set_labels(u, r, sr, mode, temperature, un)
 
     def get_working_widgets(self):
         return [widget.working_sensor.isChecked() for widget in self.widgets]
 
     def send_us(self):
         values = []
-        current_states = []
         for widget in self.widgets:
             try:
                 value = float(widget.u_set_lineedit.text())
@@ -363,12 +365,8 @@ class MeasurementWidget(QtWidgets.QWidget):
                 values.append(0)
             else:
                 values.append(value)
-            try:
-                index = r4_str_values.index(widget.r4_positions.currentText()) + 1
-            except:
-                current_states.append(3)
-            else:
-                current_states.append(index)
+
+        current_states = self.get_r4_resistance_modes()
         logger.debug(f"{values}, {current_states}")
         try:
             ms = self.settings_widget.get_new_ms()
@@ -386,7 +384,13 @@ class MeasurementWidget(QtWidgets.QWidget):
                 sr = funcs[mode](u)
                 widget.set_labels(u, r, sr, mode, 0)
 
-
-    def set_labels(self, u, r, sr, mode, temperature):
-        for value, widget in zip((u, r, sr, mode, temperature), self.current_values_layout_labels.values()):
-            widget.setText(str(value))
+    def get_r4_resistance_modes(self):
+        current_states = []
+        for widget in self.widgets:
+            try:
+                index = r4_str_values.index(widget.r4_positions.currentText()) + 1
+            except:
+                current_states.append(3)
+            else:
+                current_states.append(index)
+        return current_states

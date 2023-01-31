@@ -129,12 +129,12 @@ class QueueRunner():
             sleep(0.02)
             if not self.queue.empty():
                 data = self.queue.get()
-                us, rs, time_next_plus_t0, time_next, temperatures, gas_state, stage_num, stage_type, sensor_states = data
+                us, rs, time_next_plus_t0, time_next, temperatures, gas_state, stage_num, stage_type, sensor_states, converted = data
                 sensor_resistances = tuple(
                     converter_func_dict[sensor_state](u) for converter_func_dict, u, sensor_state in
                     zip(converter_funcs, us, sensor_states))
                 logger.debug(f"Call in cycle")
-                self.set_meas_tuple((us, rs, sensor_resistances, sensor_states, temperatures))
+                self.set_meas_tuple((us, rs, sensor_resistances, sensor_states, temperatures, converted))
                 self.hold_method((sensor_resistances, rs, time_next))
                 if not headed:
                     header_comment, header = form_header(len(rs))
@@ -145,12 +145,12 @@ class QueueRunner():
                                     stage_type, *sensor_states))
         while not self.queue.empty():
             data = self.queue.get()
-            us, rs, time_next_plus_t0, time_next, temperatures, gas_state, stage_num, stage_type, sensor_states = data
+            us, rs, time_next_plus_t0, time_next, temperatures, gas_state, stage_num, stage_type, sensor_states, converted = data
             sensor_resistances = tuple(
                 converter_func_dict[sensor_state](u) for converter_func_dict, u, sensor_state in
                 zip(converter_funcs, us, sensor_states))
             logger.debug(f"Call in cycle")
-            self.set_meas_tuple((us, rs, sensor_resistances, sensor_states, temperatures))
+            self.set_meas_tuple((us, rs, sensor_resistances, sensor_states, temperatures, converted))
             self.hold_method((sensor_resistances, rs, time_next))
             if not headed:
                 header_comment, header = form_header(len(rs))
@@ -216,9 +216,12 @@ class OperationWidget(QtWidgets.QWidget):
         start_button.clicked.connect(self.start)
         stop_button.clicked.connect(self.stop)
         self.checkbox_if_send_u_or_r = QtWidgets.QCheckBox("Send U")
+        self.checkbox_if_send_u_or_r.setChecked(True)
+        self.solid_mode_mode = QtWidgets.QCheckBox("Solid mode")
         controls_groupbox_layout.addWidget(start_button)
         controls_groupbox_layout.addWidget(stop_button)
         controls_groupbox_layout.addWidget(self.checkbox_if_send_u_or_r)
+        controls_groupbox_layout.addWidget(self.solid_mode_mode)
         controls_groupbox_layout.addStretch()
 
         layout1.addWidget(controls_groupbox)
@@ -285,6 +288,12 @@ class OperationWidget(QtWidgets.QWidget):
     def get_checkbox_state(self):
         return self.checkbox_if_send_u_or_r.isChecked()
 
+    def get_range_mode_settings(self):
+        if self.solid_mode_mode.isChecked():
+            return self.measurement_widget.get_r4_resistance_modes
+        else:
+            return None
+
     def start(self):
         if self.load_label.text() == "Loaded":
             self.refresh_state()
@@ -293,6 +302,7 @@ class OperationWidget(QtWidgets.QWidget):
                 self.generator, self.settings.get_new_ms,
                 self.measurement_widget.get_sensor_types_list,
                 self.measurement_widget.get_convert_funcs,
+                self.get_range_mode_settings(),
                 multirange,
                 self.gasstate_widget.send_state,
                 self.get_checkbox_state,
@@ -369,7 +379,7 @@ class OperationWidget(QtWidgets.QWidget):
 class ProgramRunner:
 
     def __init__(self, program_generator: ProgramGenerator, get_ms_method,
-                 get_sensor_types_list, get_convert_funcs, multirange,
+                 get_sensor_types_list, get_convert_funcs, solid_mode, multirange,
                  send_gasstate_func,
                  checkbox_state,
                  queue,
@@ -385,12 +395,15 @@ class ProgramRunner:
         self.get_sensor_types_list = get_sensor_types_list
         self.convert_funcs = get_convert_funcs("R")
         self.convert_funcs_2 = get_convert_funcs("V")
+        self.solid_mode = solid_mode
         self.multirange: bool = multirange
         self.send_gasstate_func = send_gasstate_func
         self.checkbox_state = checkbox_state
         self.sensor_number = sensor_number
         self.thread = None
         self.queue = queue
+
+        self.need_to_analyze = self.multirange and (self.solid_mode is not None)
 
     def start(self):
         self.stopped = False
@@ -418,6 +431,7 @@ class ProgramRunner:
         sensor_stab_down_states = [
                                       True,
                                   ] * self.sensor_number
+
         while not self.stopped:
             try:
                 time_next, (temperatures, gas_state, stage_num,
@@ -454,7 +468,7 @@ class ProgramRunner:
                     finally:
                         self.queue.put((us, rs, time_next_plus_t0, time_next,
                                         temperatures, gas_state, stage_num,
-                                        stage_type, sensor_states))
+                                        stage_type, sensor_states, converted))
                         self.analyze_us(ms, us, sensor_states,
                                         sensor_stab_up_states,
                                         sensor_stab_down_states)
@@ -472,7 +486,7 @@ class ProgramRunner:
 
     def analyze_us(self, ms: MS_Uni, us: np.ndarray, sensor_states: list,
                    sensor_stab_up_states: list, sensor_stab_down_states: list):
-        if self.multirange:
+        if self.need_to_analyze:
             i = 0
             for idx, value_bool in enumerate(us > 4.6):
                 if value_bool and sensor_stab_up_states[idx]:
@@ -490,6 +504,14 @@ class ProgramRunner:
                     i += 1
             if i > 0:
                 ms.send_measurement_range(sensor_states)
+        else:
+            if self.multirange:
+                new_modes = self.solid_mode()
+                if not all(mode == prev_mode for mode, prev_mode in zip(new_modes, sensor_states)):
+                    ms.send_measurement_range(new_modes)
+                    for i in range(len(sensor_states)):
+                        sensor_states[i] = new_modes[i]
+
 
 
 class AnswerPlotWidget(pg.PlotWidget):
