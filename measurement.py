@@ -297,9 +297,13 @@ class MeasurementWidget(QtWidgets.QWidget):
         self.css_boxes = CssCheckBoxes()
         self.layout().addWidget(self.css_boxes)
 
-        sensor_position_grid_layout = QtWidgets.QGridLayout()
-        self.layout().addLayout(sensor_position_grid_layout)
-        self.layout().addStretch()
+        scroll_sensor_positions_widget = QtWidgets.QScrollArea()
+        scroll_sensor_positions_widget.setWidgetResizable(True)
+        scroll_area_under_widget = QtWidgets.QWidget()
+        sensor_position_grid_layout = QtWidgets.QGridLayout(scroll_area_under_widget)
+        scroll_sensor_positions_widget.setWidget(scroll_area_under_widget)
+        self.layout().addWidget(scroll_sensor_positions_widget)
+        #self.layout().addStretch()
         for i in range(sensor_number):
             sensor_position_widget = SensorPositionWidget(
                 self, i, machine_name)
