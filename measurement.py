@@ -71,7 +71,7 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
         layout2 = QtWidgets.QFormLayout(wid2)
         self.tab_wid.addTab(wid2, "Operation")
         self.tab_wid.addTab(wid1, "DB")
-        self.current_values_layout_labels = {label: QtWidgets.QLabel() for label in ("Us:", "Rn:", "Rs:", "T:", "Un:")}
+        self.current_values_layout_labels = {label: QtWidgets.QLabel() for label in ("Us:", "Rn:", "Rs:", "Mode:", "T:", "Un:")}
 
         for label, widget in self.current_values_layout_labels.items():
             widget.setFrameStyle(QFrame.Panel)
@@ -282,6 +282,15 @@ class MeasurementWidget(QtWidgets.QWidget):
         self.send_u_button.clicked.connect(self.send_us)
         buttons_layout.addWidget(self.send_u_button)
 
+        all_working_button = QtWidgets.QPushButton("All working")
+        all_working_button.clicked.connect(self.set_all_working)
+        buttons_layout.addWidget(all_working_button)
+
+        range_for_all = QtWidgets.QComboBox()
+        range_for_all.addItems(["1", "2", "3"])
+        buttons_layout.addWidget(range_for_all)
+        range_for_all.currentTextChanged.connect(self.change_mode_for_all)
+
 
         buttons_layout.addStretch()
 
@@ -394,3 +403,20 @@ class MeasurementWidget(QtWidgets.QWidget):
             else:
                 current_states.append(index)
         return current_states
+
+    def set_all_working(self):
+        for widget in self.widgets:
+            widget.working_sensor.nextCheckState()
+
+    def change_mode_for_all(self, text):
+        exception_catched = 0
+        for widget in self.widgets:
+            try:
+                widget.r4_positions.setCurrentText(r4_str_values[int(text) - 1])
+            except:
+                exception_catched += 1
+
+        if exception_catched > 0:
+            msg_ = QtWidgets.QMessageBox()
+            msg_.setText("Not all sensors have such a mode")
+            msg_.exec_()
