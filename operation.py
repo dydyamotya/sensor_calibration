@@ -403,7 +403,7 @@ class ProgramRunner:
         self.thread = None
         self.queue = queue
 
-        self.need_to_analyze = self.multirange and (self.solid_mode is not None)
+        self.need_to_analyze = self.multirange and (self.solid_mode is None)
 
     def start(self):
         self.stopped = False
