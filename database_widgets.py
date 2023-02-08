@@ -199,6 +199,6 @@ class DatabaseNonleaderTableWidget(QtWidgets.QTableWidget):
         data = self.dump_data(process_func=float)
         r4_str_values = tuple(data.keys())
         r4_combobox_dict = ResistanseDict(zip(r4_str_values, data.values()))
-        r4_range_dict = dict(zip(r4_str_values, range(1, len(r4_str_values))))
+        r4_range_dict = dict(zip(r4_str_values, range(1, len(r4_str_values) + 1)))
         return r4_str_values, r4_combobox_dict, r4_range_dict
 
