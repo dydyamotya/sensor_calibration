@@ -166,7 +166,7 @@ class CalibrationWidget(QtWidgets.QWidget):
         self.resistances = np.zeros((self.sensor_number, all_steps))
 
         voltage_row = np.linspace(
-            initial_voltage, end_voltage + microstep, num=all_steps
+            initial_voltage, end_voltage, num=all_steps
         )
 
         self.voltages = np.vstack(
@@ -189,9 +189,9 @@ class CalibrationWidget(QtWidgets.QWidget):
 
                 if idx % dots_to_draw == 0:
                     self.cal_plot_widget.set_lines(
-                        self.voltages[:, :idx],
+                        self.voltages[:, :idx+1],
                         self.per_sensor.process_resistances(
-                            self.resistances[:, :idx]),
+                            self.resistances[:, :idx+1]),
                     )
             except MS_ABC.MSException:
                 self.last_idx = idx
@@ -258,14 +258,6 @@ class CalibrationWidget(QtWidgets.QWidget):
 
     def get_params(self):
         r0s, rns, alphas = [], [], []
-        (
-            initial_voltage,
-            steps_per_measurement,
-            end_voltage,
-            sleep_time,
-            dots_to_draw,
-            microstep,
-        ) = self.calibration_settings.get_variables()
         vmax = self.get_data()[0][0][-1]
         for r0, rn, alpha in self.per_sensor.get_variables():
             r0s.append(r0)
