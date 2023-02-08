@@ -19,6 +19,7 @@ class Machine(BaseModel):
     last_port = TextField(default="")
     sensors_number = IntegerField(default=12)
     multirange = BooleanField(default=True)
+    modes = TextField(default="{}")
 
 
 class SensorPosition(BaseModel):

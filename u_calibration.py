@@ -16,27 +16,11 @@ from models import SensorPosition
 logger = logging.getLogger(__name__)
 
 
-class ResistanseDict(UserDict):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def __getitem__(self, key):
-        if key in self.data:
-            return self.data[key]
-        else:
-            try:
-                return float(key)
-            except ValueError:
-                raise
 
 
-rs = np.array([2.1e9, 5e8, 1e8, 1e7, 1e6, 1e5, 5.1e4, 1e4, 1e3])
-r4_str_values = ["100 kOhm", "1.1 MOhm", "101.1 MOhm"]
-r4_combobox_dict = ResistanseDict(zip(r4_str_values, (1e5, 1.1e6, 1.011e8)))
-r4_range_dict = dict(zip(r4_str_values, (1, 2, 3)))
-
+rs = np.array([2e10, 1e10, 2.1e9, 5e8, 1e8, 1e7, 1e6, 1e5, 5.1e4, 1e4, 1e3])
 r_labels_str = tuple(map("{:1.2e}".format, rs))
+
 
 
 def get_float(x):
@@ -92,6 +76,8 @@ class OneSensorFrame(QtWidgets.QWidget):
                  import_widget, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
         self.settings_widget = settings
+
+        r4_str_values, r4_combobox_dict, r4_range_dict = self.settings_widget.get_r4_data()
         self.import_widget = import_widget
         self.debug_level = debug_level
         self.global_settings = global_settings
@@ -242,7 +228,9 @@ class OneSensorFrame(QtWidgets.QWidget):
 
     def fill_with_test_data(self):
         test_values = [
-            "4.63", 
+            "4.64",
+            "4.63",
+            "4.62",
             "4.61042", "4.57307", "4.20415", "2.41583", "0.75001", "0.58466",
             "0.43554", "0.40117"
         ]
@@ -258,6 +246,7 @@ class PlotWidget(QtWidgets.QWidget):
 
         self.global_settings = global_settings
         self.settings_widget = settings_widget
+        self.r4_str_values, *_ = self.settings_widget.get_r4_data()
         self.import_widget = import_widget
         self.r4 = r4
         self.sensor_num = sensor_num
@@ -320,8 +309,9 @@ class PlotWidget(QtWidgets.QWidget):
         sensor_num = int(self.sensor_num)
         x = dump(list(self.x), default_flow_style=True)
         y = dump(self.y.tolist(), default_flow_style=True)
-        if self.r4 in r4_str_values:
-            r4_index = r4_str_values.index(self.r4) + 1
+        if self.r4 in self.r4_str_values:
+
+            r4_index = self.r4_str_values.index(self.r4) + 1
             self.global_settings.setValue(f"Rs_U1_{sensor_num}_{r4_index}",
                                           float(self.popt[0]))
             self.global_settings.setValue(f"Rs_U2_{sensor_num}_{r4_index}",
@@ -349,6 +339,7 @@ class ImportCalibrationWidget(QtWidgets.QWidget):
         self.import_button = QtWidgets.QPushButton(
             "Import parameters of positions")
         self.import_button.clicked.connect(self.import_parameters)
+        self.r4_str_values, *_ = self.settings_widget.get_r4_data()
         layout.addWidget(self.import_button)
 
         hbox_layout = QtWidgets.QHBoxLayout()
@@ -389,7 +380,7 @@ class ImportCalibrationWidget(QtWidgets.QWidget):
         config.optionxform = deduplicate
         if self.load_file_lineedit.text():
             message_box = QtWidgets.QMessageBox()
-            idx_r4 = r4_str_values.index(r4)
+            idx_r4 = self.r4_str_values.index(r4)
             config.read(self.load_file_lineedit.text())
             if "Device parameters" not in config:
                 config["Device parameters"] = {}
@@ -429,7 +420,7 @@ class ImportCalibrationWidget(QtWidgets.QWidget):
         )
         not_added = []
         for sens_num in range(sensor_number):
-            for idx_r4, r4 in enumerate(r4_str_values):
+            for idx_r4, r4 in enumerate(self.r4_str_values):
                 try:
                     rs_u1 = config["Device parameters"][
                         f"Rs_U1_{sens_num+1}_{idx_r4+1}"].replace(",", ".")

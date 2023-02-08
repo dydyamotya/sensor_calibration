@@ -18,14 +18,10 @@ values_for_css_boxes = [
     MS_ABC.SEND_CSS_1_4, MS_ABC.SEND_CSS_5_8, MS_ABC.SEND_CSS_9_12
 ]
 
-r4_str_values = ["100 kOhm", "1.1 MOhm", "101.1 MOhm"]
-r4_to_int = dict(zip(r4_str_values, range(1, 4)))
-r4_to_float = dict(zip(r4_str_values, (1e5, 1.1e6, 1.011e8)))
-
 
 class SensorPositionWidget(QtWidgets.QGroupBox):
 
-    def __init__(self, parent, sensor_num, machine_name):
+    def __init__(self, parent, sensor_num, machine_name, r4_str_values, r4_to_float, r4_to_int):
         super(SensorPositionWidget, self).__init__(parent)
         self.sensor_positions = None
         self.sensor_num = sensor_num
@@ -34,6 +30,9 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
         self.py_parent = parent
         self.resistances_convertors_loaded = False
         self.setTitle(f"Sensor {sensor_num + 1}")
+        self.r4_str_values = r4_str_values
+        self.r4_to_float = r4_to_float
+        self.r4_to_int = r4_to_int
         self._init_ui()
 
     def _get_sensor_positions_from_db(self):
@@ -205,7 +204,7 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
         funcs_dict = {}
         if (self.resistances_convertors_loaded and self.working_sensor.isChecked()):
             r4s = tuple(sensor_position.r4 for sensor_position in self.sensor_positions)
-            for r4_str in r4_str_values:
+            for r4_str in self.r4_str_values:
                 if r4_str in r4s:
                     logger.debug(f"R4 in set of calibrated {r4_str} {r4s}")
                     sensor_position, *_ = [
@@ -214,7 +213,7 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
                     ]
                     rs_u1 = float(sensor_position.rs_u1)
                     rs_u2 = float(sensor_position.rs_u2)
-                    r4 = r4_to_float[sensor_position.r4]
+                    r4 = self.r4_to_float[sensor_position.r4]
 
                     vertical_asimptote = 2.5 + 4.068 * (2.5 - rs_u2)
 
@@ -224,14 +223,14 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
                         else:
                             return 1e14
 
-                    funcs_dict[r4_to_int[sensor_position.r4]] = f
+                    funcs_dict[self.r4_to_int[sensor_position.r4]] = f
                 else:
                     logger.debug(f"R4 not in set of calibrated {r4_str} {r4s}")
-                    funcs_dict[r4_to_int[r4_str]] = lambda u: u
+                    funcs_dict[self.r4_to_int[r4_str]] = lambda u: u
         else:
             logger.debug("Not calibrated")
-            for r4_str in r4_str_values:
-                funcs_dict[r4_to_int[r4_str]] = lambda u: u
+            for r4_str in self.r4_str_values:
+                funcs_dict[self.r4_to_int[r4_str]] = lambda u: u
         return funcs_dict
 
     def set_labels(self, u, r, sr, mode, temperature, un=0):
@@ -264,6 +263,7 @@ class MeasurementWidget(QtWidgets.QWidget):
         clear_layout(self.layout())
         comport, sensor_number, multirange, machine_name, machine_id = self.settings_widget.get_variables(
         )
+        self.r4_str_values, r4_to_float, r4_to_int = self.settings_widget.get_r4_data()
         self.multirange_state = multirange
 
         buttons_layout = QtWidgets.QHBoxLayout()
@@ -306,7 +306,7 @@ class MeasurementWidget(QtWidgets.QWidget):
         #self.layout().addStretch()
         for i in range(sensor_number):
             sensor_position_widget = SensorPositionWidget(
-                self, i, machine_name)
+                self, i, machine_name, self.r4_str_values, r4_to_float, r4_to_int)
             sensor_position_grid_layout.addWidget(sensor_position_widget,
                                                   i // 4, i % 4)
             sensor_position_grid_layout.setColumnStretch(i % 4, 1)
@@ -401,7 +401,7 @@ class MeasurementWidget(QtWidgets.QWidget):
         current_states = []
         for widget in self.widgets:
             try:
-                index = r4_str_values.index(widget.r4_positions.currentText()) + 1
+                index = self.r4_str_values.index(widget.r4_positions.currentText()) + 1
             except:
                 current_states.append(3)
             else:
@@ -416,7 +416,7 @@ class MeasurementWidget(QtWidgets.QWidget):
         exception_catched = 0
         for widget in self.widgets:
             try:
-                widget.r4_positions.setCurrentText(r4_str_values[int(text) - 1])
+                widget.r4_positions.setCurrentText(self.r4_str_values[int(text) - 1])
             except:
                 exception_catched += 1
 
