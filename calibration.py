@@ -239,6 +239,7 @@ class CalibrationWidget(QtWidgets.QWidget):
             if any(self.resistances.flatten() > 0):
                 voltages, _, temperatures = self.get_data()
                 self.cal_plot_widget.set_lines(voltages, temperatures)
+                self.cal_plot_widget.plot_new_data()
 
     def get_data(self):
         try:
