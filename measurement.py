@@ -206,7 +206,6 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
             r4s = tuple(sensor_position.r4 for sensor_position in self.sensor_positions)
             for r4_str in self.r4_str_values:
                 if r4_str in r4s:
-                    logger.debug(f"R4 in set of calibrated {r4_str} {r4s}")
                     sensor_position, *_ = [
                         sensor_position for sensor_position in self.sensor_positions
                         if sensor_position.r4 == r4_str
@@ -224,6 +223,7 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
                         else:
                             return 1e14
 
+                    logger.debug(f"R4 is calibrated {r4_str} {r4s} {rs_u1} {rs_u2}")
                     funcs_dict[self.r4_to_int[sensor_position.r4]] = f
                 else:
                     logger.debug(f"R4 not in set of calibrated {r4_str} {r4s}")
@@ -396,6 +396,7 @@ class MeasurementWidget(QtWidgets.QWidget):
                                      sensor_types_list=sensor_types_list)
             for widget, u, r, mode in zip(self.widgets, us ,rs, current_states):
                 funcs = widget.get_voltage_to_resistance_funcs()
+                logger.debug(str(funcs))
                 sr = funcs[mode](u)
                 widget.set_labels(u, r, sr, mode, 0)
 
