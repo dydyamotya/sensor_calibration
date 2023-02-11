@@ -218,6 +218,7 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
                     vertical_asimptote = 2.5 + 4.068 * (2.5 - rs_u2)
 
                     def f(u):
+                        logger.debug(f"rs1: {rs_u1}, rs2: {rs_u2}, r4: {r4}, u: {u}")
                         if u < vertical_asimptote:
                             return (rs_u1 - rs_u2) * r4 / ((2.5 + 2.5 * 4.068 - u) / 4.068 - rs_u2) - r4
                         else:
