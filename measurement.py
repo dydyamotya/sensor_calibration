@@ -255,6 +255,7 @@ class MeasurementWidget(QtWidgets.QWidget):
         self.css_boxes = None
         self.multirange_state = False
         self.settings_widget.redraw_signal.connect(self.init_ui)
+        self.settings_widget.calibration_redraw_signal.connect(self.init_ui)
         self.init_ui()
 
     def init_ui(self):
@@ -406,6 +407,7 @@ class MeasurementWidget(QtWidgets.QWidget):
                 current_states.append(3)
             else:
                 current_states.append(index)
+        logger.debug(str(current_states))
         return current_states
 
     def set_all_working(self):

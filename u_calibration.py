@@ -12,11 +12,9 @@ from PySide2 import QtWidgets, QtCore, QtGui
 import logging
 import pyqtgraph as pg
 from models import SensorPosition
+from misc import clear_layout, CssCheckBoxes
 
 logger = logging.getLogger(__name__)
-
-
-
 
 rs = np.array([2e10, 1e10, 2.1e9, 5e8, 1e8, 1e7, 1e6, 1e5, 5.1e4, 1e4, 1e3])
 r_labels_str = tuple(map("{:1.2e}".format, rs))
@@ -37,22 +35,26 @@ class UCalibrationWidget(QtWidgets.QWidget):
         super().__init__(*args, **kwargs)
         self.debug_level = debug_level
         self.py_parent = py_parent
+        self.settings_widget = py_parent.settings_widget
         self.global_settings = global_settings
+        self.import_widget = self.py_parent.import_widget
+        self.settings_widget.calibration_redraw_signal.connect(self._init_ui)
+        QtWidgets.QVBoxLayout(self)
         self._init_ui()
 
     def _init_ui(self):
-        layout = QtWidgets.QVBoxLayout()
-        self.setLayout(layout)
+        clear_layout(self.layout())
+        self.setLayout(self.layout())
+        self.widgets = []
 
-        self.settings_widget = self.py_parent.settings_widget
-        self.import_widget = self.py_parent.import_widget
 
         hbox_layout = QtWidgets.QHBoxLayout()
-        layout.addLayout(hbox_layout)
+        self.layout().addLayout(hbox_layout)
         for _ in range(3):
-            hbox_layout.addWidget(
-                OneSensorFrame(self, self.settings_widget, self.debug_level,
-                               self.global_settings, self.import_widget))
+            widget = OneSensorFrame(self, self.settings_widget, self.debug_level,
+                           self.global_settings, self.import_widget)
+            hbox_layout.addWidget(widget)
+            self.widgets.append(widget)
         hbox_layout.addStretch()
 
 

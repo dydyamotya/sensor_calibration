@@ -8,6 +8,7 @@ from sensor_system import MS_Uni
 
 class EquipmentSettings(QtWidgets.QWidget):
     redraw_signal = QtCore.Signal(int)
+    calibration_redraw_signal = QtCore.Signal(int)
 
     def __init__(self, global_settings, *args, **kwargs):
         super().__init__(*args, f=QtCore.Qt.Tool, **kwargs)
@@ -45,7 +46,14 @@ class EquipmentSettings(QtWidgets.QWidget):
         self.comport_widget.activated.connect(self.redraw_signal.emit)
         self.modes_widget.someValueChanged.connect(self.redraw_signal.emit)
 
+        self.machine_name_widget.activated.connect(self.calibration_redraw_signal.emit)
+        self.multirange_widget.activated.connect(self.calibration_redraw_signal.emit)
+        self.sensor_number_widget.activated.connect(self.calibration_redraw_signal.emit)
+        self.comport_widget.activated.connect(self.calibration_redraw_signal.emit)
+        self.modes_widget.someValueChanged.connect(self.calibration_redraw_signal.emit)
+
         self.redraw_signal.connect(self.save_settings)
+        self.calibration_redraw_signal.connect(self.save_settings)
 
         last_model_name = self.global_settings.value("lastmodel")
         try:
