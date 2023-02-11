@@ -285,6 +285,8 @@ class PlotWidget(QtWidgets.QWidget):
         p1.plot(linspace, func(linspace, *popt))
         p2.setXLink(p1)
         p2.plot(x, np.abs((y - func(np.array(x), *popt)) / y), symbol="o")
+        screen = QtWidgets.QDesktopWidget().screenGeometry()
+        self.move(screen.width() / 2, screen.height() / 2)
         self.show()
 
     def keyReleaseEvent(self, event):

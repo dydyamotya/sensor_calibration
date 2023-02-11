@@ -10,7 +10,7 @@ from sensor_system import MS_ABC
 from PySide2 import QtWidgets, QtCore, QtGui
 import logging
 from models import SensorPosition, fn, Machine
-from misc import clear_layout, CssCheckBoxes
+from misc import clear_layout, CssCheckBoxes, PlotCalibrationWidget
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,8 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
         layout2 = QtWidgets.QFormLayout(wid2)
         self.tab_wid.addTab(wid2, "Operation")
         self.tab_wid.addTab(wid1, "DB")
-        self.current_values_layout_labels = {label: QtWidgets.QLabel() for label in ("Us:", "Rn:", "Rs:", "Mode:", "T:", "Un:")}
+        self.current_values_layout_labels = {label: QtWidgets.QLabel() for label in
+                                             ("Us:", "Rn:", "Rs:", "Mode:", "T:", "Un:")}
 
         for label, widget in self.current_values_layout_labels.items():
             widget.setFrameStyle(QFrame.Panel)
@@ -79,7 +80,6 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
             layout2.addRow(label, widget)
         self.u_set_lineedit = QtWidgets.QLineEdit()
         layout2.addRow("Set U", self.u_set_lineedit)
-
 
         if self.sensor_positions is None or len(self.sensor_positions) == 0:
             layout.addWidget(QtWidgets.QLabel("No data"))
@@ -103,7 +103,6 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
             buttons_layout = QtWidgets.QHBoxLayout()
             layout.addLayout(buttons_layout, stretch=0)
 
-
             sensor_position_layout = QtWidgets.QFormLayout()
             layout.addLayout(sensor_position_layout, stretch=1)
             sensor_position_layout.addRow("Machine name",
@@ -116,11 +115,15 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
                 sensor_position_layout.addRow(label, label_widget)
 
             self.choose_sensor_range(positions_r4s_combobox.currentText())
+
+            button_calibration_draw = QtWidgets.QPushButton("Draw calibration")
+            button_calibration_draw.clicked.connect(self.draw_calibration)
+            layout.addWidget(button_calibration_draw)
         layout.addStretch()
 
     def _init_sensor_position(self, sensor_position):
         for (label, label_widget), format_ in zip(self.labels.items(), (
-        lambda x: f"{x:2.4f}", lambda x: f"{x:2.4f}", lambda x: x.strftime("%Y.%m.%d"))):
+                lambda x: f"{x:2.4f}", lambda x: f"{x:2.4f}", lambda x: x.strftime("%Y.%m.%d"))):
             label_widget.setText(format_(getattr(sensor_position, label)))
 
     def change_color(self):
@@ -248,6 +251,31 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
                 else:
                     self.current_values_layout_labels[widget_key].setText(f"{value:1.5e}")
 
+    def get_current_sensor_position_from_database(self):
+
+        r4_str = self.r4_positions.currentText()
+        sensor_position, *_ = [
+            sensor_position for sensor_position in self.sensor_positions
+            if sensor_position.r4 == r4_str
+        ]
+        return sensor_position
+
+    def draw_calibration(self):
+        sensor_position: SensorPosition = self.get_current_sensor_position_from_database()
+        try:
+            PlotCalibrationWidget(self,
+                                  sensor_position.x,
+                                  sensor_position.y,
+                                  sensor_position.rs_u1,
+                                  sensor_position.rs_u2,
+                                  self.r4_to_float[sensor_position.r4])
+        except:
+            msg_ = QtWidgets.QMessageBox()
+            msg_.setText("No data")
+            msg_.setWindowTitle("Warning")
+            msg_.exec_()
+
+
 
 class MeasurementWidget(QtWidgets.QWidget):
 
@@ -296,7 +324,6 @@ class MeasurementWidget(QtWidgets.QWidget):
         buttons_layout.addWidget(range_for_all)
         range_for_all.currentTextChanged.connect(self.change_mode_for_all)
 
-
         buttons_layout.addStretch()
 
         self.css_boxes = CssCheckBoxes()
@@ -308,7 +335,7 @@ class MeasurementWidget(QtWidgets.QWidget):
         sensor_position_grid_layout = QtWidgets.QGridLayout(scroll_area_under_widget)
         scroll_sensor_positions_widget.setWidget(scroll_area_under_widget)
         self.layout().addWidget(scroll_sensor_positions_widget)
-        #self.layout().addStretch()
+        # self.layout().addStretch()
         for i in range(sensor_number):
             sensor_position_widget = SensorPositionWidget(
                 self, i, machine_name, self.r4_str_values, r4_to_float, r4_to_int)
@@ -326,8 +353,8 @@ class MeasurementWidget(QtWidgets.QWidget):
             npzfile = np.load(filename)
             try:
                 voltages, resistances, temperatures = npzfile[
-                                                          "voltages"], npzfile["resistances"], npzfile[
-                                                          "temperatures"]
+                    "voltages"], npzfile["resistances"], npzfile[
+                    "temperatures"]
             except KeyError:
                 self.load_status_label.setText("Not loaded")
                 self.load_status_label.setStyleSheet("background-color:pink")
@@ -367,7 +394,7 @@ class MeasurementWidget(QtWidgets.QWidget):
 
     def set_results_values_to_widgets(self, us, rs, srs, modes, temperatures, uns=None):
         if uns is None:
-            uns = (0, ) * 12
+            uns = (0,) * 12
         for u, r, sr, mode, temperature, un, widget in zip(us, rs, srs, modes, temperatures, uns, self.widgets):
             widget.set_labels(u, r, sr, mode, temperature, un)
 
@@ -397,7 +424,7 @@ class MeasurementWidget(QtWidgets.QWidget):
             sensor_types_list = self.get_sensor_types_list()
             us, rs = ms.full_request(values, request_type=MS_ABC.REQUEST_U,
                                      sensor_types_list=sensor_types_list)
-            for widget, u, r, mode in zip(self.widgets, us ,rs, current_states):
+            for widget, u, r, mode in zip(self.widgets, us, rs, current_states):
                 funcs = widget.get_voltage_to_resistance_funcs()
                 logger.debug(str(funcs))
                 sr = funcs[mode](u)

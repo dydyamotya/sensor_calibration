@@ -1,7 +1,10 @@
 import PySide2.QtGui
-from PySide2 import QtWidgets
+from PySide2 import QtWidgets, QtCore
 from PySide2.QtCore import Signal
 from PySide2.QtGui import QPixmap, QColor
+
+import numpy as np
+import pyqtgraph as pg
 
 class Lamp(QtWidgets.QLabel):
     def __init__(self, *args, **kwargs):
@@ -84,3 +87,40 @@ class CssCheckBoxes(QtWidgets.QGroupBox):
         layout.addStretch()
     def collect_checkboxes(self):
         return [checkbox.isChecked() for checkbox in self.checkboxes]
+
+
+
+class PlotCalibrationWidget(QtWidgets.QWidget):
+    def __init__(self, parent, x, y, rs_u1, rs_u2, r4):
+        super().__init__(parent, f=QtCore.Qt.Tool)
+
+        gl_widget = pg.GraphicsLayoutWidget()
+        p1 = gl_widget.addPlot()
+        gl_widget.nextRow()
+        p2 = gl_widget.addPlot()
+
+        layout = QtWidgets.QVBoxLayout()
+        self.setLayout(layout)
+        layout.addWidget(gl_widget)
+
+
+
+        p1.setLogMode(y=True)
+        p1.setLabel("bottom", "Voltage, V")
+        p1.setLabel("left", "log(R)")
+        self.setWindowTitle("Visualization of regression")
+        p1.plot(x, y, symbol="o", pen=None)
+        linspace = np.linspace(0, 5, num=10000)
+
+        k = 4.068
+        def f(u, rs1, rs2):
+            return (rs1 - rs2) * r4 / ((2.5 + 2.5 * k - u) / k - rs2) - r4
+
+        p1.plot(linspace, f(linspace, rs_u1, rs_u2))
+        p2.setXLink(p1)
+        p2.plot(x, np.abs((y - f(np.array(x), rs_u1, rs_u2)) / y), symbol="o")
+        screen = QtWidgets.QDesktopWidget().screenGeometry()
+        self.move(screen.width() / 2, screen.height() / 2)
+        self.show()
+
+

@@ -1,7 +1,7 @@
 from threading import Thread
 from PySide2 import QtWidgets
 from PySide2.QtGui import QPixmap, QColor
-from PySide2.QtCore import Slot, Qt
+from PySide2.QtCore import Slot, Qt, Signal
 from sensor_system import MS_Uni, MS_ABC
 from misc import TypeCheckLineEdit, clear_layout, CssCheckBoxes
 import time
@@ -25,6 +25,8 @@ values_for_css_boxes = [MS_ABC.SEND_CSS_1_4,
 
 
 class CalibrationWidget(QtWidgets.QWidget):
+
+    got_new_data = Signal()
     def __init__(self, parent, log_level, global_settings):
         super().__init__()
         self.setWindowTitle("Calibration")
@@ -42,6 +44,7 @@ class CalibrationWidget(QtWidgets.QWidget):
 
         self.calibration_settings = CalibrationSettings(self)
         self.cal_plot_widget = CalibrationPlotWidget(self)
+        self.got_new_data.connect(self.cal_plot_widget.plot_new_data)
         self.cal_buttons = CalibrationButtons(self)
 
         scroll_per_sensor = QtWidgets.QScrollArea()
@@ -193,6 +196,7 @@ class CalibrationWidget(QtWidgets.QWidget):
                         self.per_sensor.process_resistances(
                             self.resistances[:, :idx+1]),
                     )
+                    self.got_new_data.emit()
             except MS_ABC.MSException:
                 self.last_idx = idx
                 self.stopped = True
@@ -468,6 +472,8 @@ class CalibrationPlotWidget(pg.PlotWidget):
         super().__init__(*args, **kwargs)
         self.legend = pg.LegendItem(offset=(-10, 10), labelTextColor=pg.mkColor("#FFFFFF"),
                                     brush=pg.mkBrush(pg.mkColor("#111111")))
+        self.voltages = None
+        self.temperatures = None
         plot_item = self.getPlotItem()
         plot_item.disableAutoRange()
         plot_item.setXRange(-0.2, 5.2)
@@ -487,8 +493,12 @@ class CalibrationPlotWidget(pg.PlotWidget):
             self.legend.addItem(plot_data_item, f"Sensor {idx + 1}")
 
     def set_lines(self, voltages, temperatures):
+        self.voltages = voltages
+        self.temperatures = temperatures
+
+    def plot_new_data(self):
         for plot_item, voltage_row, temperature_row in zip(
-                self.plot_data_items, voltages, temperatures
+                self.plot_data_items, self.voltages, self.temperatures
         ):
             plot_item.setData(x=voltage_row, y=temperature_row)
 
