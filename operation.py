@@ -23,6 +23,10 @@ logger = logging.getLogger(__name__)
 colors_for_lines = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22',
                     '#17becf', "#DDDDDD", "#00FF00"]
 
+def format_floats(floats_list):
+    return (f"{x:5.5f}" for x in floats_list)
+
+
 class LinesDrawButton(QtWidgets.QPushButton):
     def __init__(self, plot_widget, *args, **kwargs):
         super(LinesDrawButton, self).__init__("Lines toggle", *args, **kwargs)
@@ -110,18 +114,22 @@ class QueueRunner():
         headed = False
 
         def form_header(sensor_number):
-            header_comment = ("Time,s", *(f"U{idx},V" for idx in range(sensor_number)),
-                              *(f"Rn{idx},Ohm" for idx in range(sensor_number)),
+            header_comment = ("Time,s",
+                              # *(f"U{idx},V" for idx in range(sensor_number)),
+                              # *(f"Rn{idx},Ohm" for idx in range(sensor_number)),
                               *(f"Rs{idx},Ohm" for idx in range(sensor_number)),
                               *(f"T{idx},C" for idx in range(sensor_number)),
                               "gas_state", "stage_num", "stage_type",
-                              *(f"State{idx},V" for idx in range(sensor_number)))
-            header = ("Time", *(f"U{idx}" for idx in range(sensor_number)),
-                      *(f"Rn{idx}" for idx in range(sensor_number)),
+                              # *(f"State{idx}" for idx in range(sensor_number))
+                              )
+            header = ("Time",
+                      # *(f"U{idx}" for idx in range(sensor_number)),
+                      # *(f"Rn{idx}" for idx in range(sensor_number)),
                       *(f"Rs{idx}" for idx in range(sensor_number)),
                       *(f"T{idx}" for idx in range(sensor_number)),
                       "gas_state", "stage_num", "stage_type",
-                      *(f"State{idx},V" for idx in range(sensor_number)))
+                      # *(f"State{idx}" for idx in range(sensor_number))
+                      )
             return header_comment, header
 
         converter_funcs = self.converter_funcs_dicts()
@@ -141,8 +149,16 @@ class QueueRunner():
                     csvwriter.writerow(header_comment)
                     csvwriter.writerow(header)
                     headed = True
-                csvwriter.writerow((time_next, *us, *rs, *sensor_resistances, *temperatures, gas_state, stage_num,
-                                    stage_type, *sensor_states))
+                csvwriter.writerow((time_next,
+                                    # *us,
+                                    # *rs,
+                                    *format_floats(sensor_resistances),
+                                    *format_floats(temperatures),
+                                    gas_state,
+                                    stage_num,
+                                    stage_type,
+                                    # *sensor_states
+                                    ))
         while not self.queue.empty():
             data = self.queue.get()
             us, rs, time_next_plus_t0, time_next, temperatures, gas_state, stage_num, stage_type, sensor_states, converted = data
@@ -157,8 +173,16 @@ class QueueRunner():
                 csvwriter.writerow(header_comment)
                 csvwriter.writerow(header)
                 headed = True
-            csvwriter.writerow((time_next, *us, *rs, *sensor_resistances, *temperatures, gas_state, stage_num,
-                                stage_type, *sensor_states))
+            csvwriter.writerow((time_next,
+                                # *us,
+                                # *rs,
+                                *format_floats(sensor_resistances),
+                                *format_floats(temperatures),
+                                gas_state,
+                                stage_num,
+                                stage_type,
+                                # *sensor_states
+                                ))
 
         fd.close()
 
