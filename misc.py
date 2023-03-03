@@ -88,7 +88,13 @@ class CssCheckBoxes(QtWidgets.QGroupBox):
     def collect_checkboxes(self):
         return [checkbox.isChecked() for checkbox in self.checkboxes]
 
+    def disable_all_checkboxes(self):
+        for checkbox in self.checkboxes:
+            checkbox.setCheckable(False)
 
+    def enable_all_checkboxes(self):
+        for checkbox in self.checkboxes:
+            checkbox.setCheckable(True)
 
 class PlotCalibrationWidget(QtWidgets.QWidget):
     def __init__(self, parent, x, y, rs_u1, rs_u2, r4):

@@ -1,3 +1,5 @@
+from typing import Collection, Optional
+
 from PySide2.QtWidgets import QFrame
 from yaml import load, dump
 from collections import UserDict
@@ -23,7 +25,7 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
 
     def __init__(self, parent, sensor_num, machine_name, r4_str_values, r4_to_float, r4_to_int):
         super(SensorPositionWidget, self).__init__(parent)
-        self.sensor_positions = None
+        self.sensor_positions: Optional[Collection[Optional[SensorPosition]]] = None
         self.sensor_num = sensor_num
         self.machine_name = machine_name
         self.temperatures_loaded = False
@@ -262,10 +264,12 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
 
     def draw_calibration(self):
         sensor_position: SensorPosition = self.get_current_sensor_position_from_database()
+        x = tuple(map(float, sensor_position.x[1:-1].split(",")))
+        y = tuple(map(float, sensor_position.y[1:-1].split(",")))
         try:
             PlotCalibrationWidget(self,
-                                  sensor_position.x,
-                                  sensor_position.y,
+                                  x,
+                                  y,
                                   sensor_position.rs_u1,
                                   sensor_position.rs_u2,
                                   self.r4_to_float[sensor_position.r4])
@@ -274,6 +278,10 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
             msg_.setText("No data")
             msg_.setWindowTitle("Warning")
             msg_.exec_()
+
+    def get_critical_voltages(self):
+        for sensor_position in self.sensor_positions:
+            sensor_position.rs_u2
 
 
 
@@ -284,10 +292,11 @@ class MeasurementWidget(QtWidgets.QWidget):
         QtWidgets.QVBoxLayout(self)
         self.settings_widget = parent.settings_widget
         self.widgets = []
-        self.css_boxes = None
+        self.css_boxes: Optional[CssCheckBoxes] = None
         self.multirange_state = False
         self.settings_widget.redraw_signal.connect(self.init_ui)
         self.settings_widget.calibration_redraw_signal.connect(self.init_ui)
+        self.settings_widget.start_program_signal.connect(self.process_program_signal)
         self.init_ui()
 
     def init_ui(self):
@@ -458,3 +467,11 @@ class MeasurementWidget(QtWidgets.QWidget):
             msg_ = QtWidgets.QMessageBox()
             msg_.setText("Not all sensors have such a mode")
             msg_.exec_()
+
+    def process_program_signal(self, started_flag):
+        if started_flag:
+            self.css_boxes.disable_all_checkboxes()
+            self.send_u_button.setEnabled(False)
+        else:
+            self.css_boxes.enable_all_checkboxes()
+            self.send_u_button.setEnabled(True)

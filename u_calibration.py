@@ -1,18 +1,16 @@
 import configparser
 import datetime
 
-from yaml import load, dump
-from collections import UserDict
+from yaml import dump
 import numpy as np
 from scipy.optimize import curve_fit
 import platform
-from sensor_system import MS_Uni
 
 from PySide2 import QtWidgets, QtCore, QtGui
 import logging
 import pyqtgraph as pg
 from models import SensorPosition
-from misc import clear_layout, CssCheckBoxes
+from misc import clear_layout
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +53,22 @@ class UCalibrationWidget(QtWidgets.QWidget):
                            self.global_settings, self.import_widget)
             hbox_layout.addWidget(widget)
             self.widgets.append(widget)
+
+        clear_all_button = QtWidgets.QPushButton("Очистить")
+        clear_all_button.clicked.connect(self.clear_all)
+        hbox_layout.addWidget(clear_all_button)
         hbox_layout.addStretch()
+
+    def clear_all(self):
+        msgbox = QtWidgets.QMessageBox()
+        msgbox.setText("Уверены, что хотите очистить поля?")
+        msgbox.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+        msgbox.setDefaultButton(QtWidgets.QMessageBox.Yes)
+        ret = msgbox.exec_()
+        if ret == QtWidgets.QMessageBox.Yes:
+            for widget in self.widgets:
+                for entry in widget.entries.values():
+                    entry.clear()
 
 
 class PlusWidget(QtWidgets.QWidget):
@@ -116,27 +129,28 @@ class OneSensorFrame(QtWidgets.QWidget):
 
             def measure_u():
                 ms = self.settings_widget.get_new_ms()
-                try:
-                    if r4_widget.currentText() in r4_str_values:
-                        ms.send_measurement_range(
-                            (r4_range_dict[r4_widget.currentText()], ) * 12)
-                    else:
-                        pass
-
-                    answers = [
-                        ms.full_request((0, ) * 12)[0] for _ in range(15)
-                    ]
+                if ms is not None:
                     try:
-                        self.entries[r_labels_str[index]].setText(
-                            "{:2.5f}".format(
-                                sum([
-                                    answer[int(sensor_widget.currentText()) -
-                                           1] for answer in answers[5:]
-                                ]) / 10))
-                    except IndexError:
-                        print("No sensor there")
-                except:
-                    ms.close()
+                        if r4_widget.currentText() in r4_str_values:
+                            ms.send_measurement_range(
+                                (r4_range_dict[r4_widget.currentText()], ) * 12)
+                        else:
+                            pass
+
+                        answers = [
+                            ms.full_request((0, ) * 12)[0] for _ in range(15)
+                        ]
+                        try:
+                            self.entries[r_labels_str[index]].setText(
+                                "{:2.5f}".format(
+                                    sum([
+                                        answer[int(sensor_widget.currentText()) -
+                                               1] for answer in answers[5:]
+                                    ]) / 10))
+                        except IndexError:
+                            print("No sensor there")
+                    except:
+                        ms.close()
 
             return measure_u
 
@@ -302,8 +316,8 @@ class PlotWidget(QtWidgets.QWidget):
                               rs_u1=self.popt[0],
                               rs_u2=self.popt[1],
                               k=4.068,
-                              x=self.x,
-                              y=self.y)
+                              x=list(self.x),
+                              y=list(self.y))
         self.import_widget.configure_load_file(self.sensor_num, self.r4,
                                                self.popt[0], self.popt[1])
         self.settings_widget.redraw_signal.emit(machine_id)

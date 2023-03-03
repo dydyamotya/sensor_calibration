@@ -57,6 +57,7 @@ class CalibrationWidget(QtWidgets.QWidget):
         self.css_checkboxes = CssCheckBoxes(self)
 
         self.parent_py.settings_widget.redraw_signal.connect(self.per_sensor.ui_init)
+        self.parent_py.settings_widget.start_program_signal.connect(self.cal_buttons.process_program_start)
 
         layout.addLayout(left_layout)
 
@@ -148,6 +149,7 @@ class CalibrationWidget(QtWidgets.QWidget):
         finally:
             self.ms.close()
             self.ms = None
+            self.recalc_signal_handler()
 
     def loop_ms(self):
         if self.ms:
@@ -260,6 +262,7 @@ class CalibrationWidget(QtWidgets.QWidget):
         self.last_idx = voltages.shape[1]
         self.voltages = voltages
         self.resistances = resistances
+        self.recalc_signal_handler()
 
     def get_params(self):
         r0s, rns, alphas = [], [], []
@@ -436,6 +439,12 @@ class CalibrationButtons(QtWidgets.QWidget):
     def turn_enable(self):
         for button in self.buttons:
             button.setEnabled(True)
+
+    def process_program_start(self, started_flag):
+        if started_flag:
+            self.turn_disable()
+        else:
+            self.turn_enable()
 
 
 class CalibrationSettings(QtWidgets.QWidget):

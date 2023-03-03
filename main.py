@@ -92,7 +92,7 @@ def main():
     menu_bar.addAction(action)
 
     plotter_menu = menu_bar.addMenu("Plotter")
-    main_window.plotter_experiment_widget = ExperimentPlotter(main_window)
+    main_window.plotter_experiment_widget = ExperimentPlotter()
     action = QtWidgets.QAction("Experiment plotter", main_window)
     action.triggered.connect(main_window.plotter_experiment_widget.toggle_visibility)
     plotter_menu.addAction(action)

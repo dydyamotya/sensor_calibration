@@ -220,13 +220,13 @@ class OperationWidget(QtWidgets.QWidget):
         load_program_groupbox = QtWidgets.QGroupBox()
         load_program_groupbox.setTitle("Program")
         load_program_groupbox_layout = QtWidgets.QHBoxLayout(load_program_groupbox)
-        load_program_button = QtWidgets.QPushButton("Load program")
-        load_program_button.clicked.connect(self.load_program)
+        self.load_program_button = QtWidgets.QPushButton("Load program")
+        self.load_program_button.clicked.connect(self.load_program)
 
         self.load_label = QtWidgets.QLabel("Not loaded")
         self.load_label.setFrameStyle(QFrame.Panel)
         self.load_label.setStyleSheet("background-color:pink")
-        load_program_groupbox_layout.addWidget(load_program_button)
+        load_program_groupbox_layout.addWidget(self.load_program_button)
         load_program_groupbox_layout.addWidget(self.load_label)
         load_program_groupbox_layout.addStretch()
 
@@ -321,6 +321,8 @@ class OperationWidget(QtWidgets.QWidget):
     def start(self):
         if self.load_label.text() == "Loaded":
             self.refresh_state()
+            self.settings.start_program_signal.emit(1)
+            self.load_program_button.setEnabled(False)
             comport, sensor_number, multirange, *_ = self.settings.get_variables()
             self.runner = ProgramRunner(
                 self.generator, self.settings.get_new_ms,
@@ -349,6 +351,8 @@ class OperationWidget(QtWidgets.QWidget):
         self.timer_plot.stop()
         self.values_set_timer.stop()
         self.lamp.set_stop()
+        self.settings.start_program_signal.emit(0)
+        self.load_program_button.setEnabled(True)
 
     def load_program(self):
         filename, filter = QtWidgets.QFileDialog.getOpenFileName(

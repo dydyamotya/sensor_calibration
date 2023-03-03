@@ -9,6 +9,7 @@ from sensor_system import MS_Uni
 class EquipmentSettings(QtWidgets.QWidget):
     redraw_signal = QtCore.Signal(int)
     calibration_redraw_signal = QtCore.Signal(int)
+    start_program_signal = QtCore.Signal(int)
 
     def __init__(self, global_settings, *args, **kwargs):
         super().__init__(*args, f=QtCore.Qt.Tool, **kwargs)
@@ -16,6 +17,8 @@ class EquipmentSettings(QtWidgets.QWidget):
         self.setLayout(layout)
         self.setWindowTitle("Settings")
         self.global_settings = global_settings
+        self.running_program = False
+        self.start_program_signal.connect(self.process_start_program_signal)
 
         self.machine_name_widget = DatabaseLeaderComboboxWidget(Machine, "name")
         layout.addRow("Machine name:", self.machine_name_widget)
@@ -70,7 +73,10 @@ class EquipmentSettings(QtWidgets.QWidget):
                 self.machine_name_widget.get_id())
 
     def get_new_ms(self):
-        return MS_Uni(self.sensor_number_widget.get_value(), self.comport_widget.get_value())
+        if not self.running_program:
+            return MS_Uni(self.sensor_number_widget.get_value(), self.comport_widget.get_value())
+        else:
+            return None
 
     def get_r4_data(self):
         return self.modes_widget.get_data()
@@ -87,3 +93,6 @@ class EquipmentSettings(QtWidgets.QWidget):
     def keyReleaseEvent(self, event):
         if event.key() == QtCore.Qt.Key_Escape:
             self.close()
+
+    def process_start_program_signal(self, started_flag):
+        self.running_program = started_flag
