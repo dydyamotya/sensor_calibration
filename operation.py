@@ -1,4 +1,5 @@
 import datetime
+import struct
 
 from PySide2 import QtWidgets, QtCore
 from PySide2.QtCore import Signal, QTimer, Qt
@@ -102,6 +103,7 @@ class QueueRunner():
             self.thread = threading.Thread(target=self.cycle)
             self.filename = (pathlib.Path("./tests") / datetime.datetime.now().strftime("%Y%m%d-%H%M%S")).with_suffix(
                 ".txt")
+            self.binary_filename = (pathlib.Path("./tests") / datetime.datetime.now().strftime("%Y%m%d-%H%M%S")).with_suffix(".dat")
             self.thread.start()
 
     def join(self):
@@ -110,8 +112,11 @@ class QueueRunner():
 
     def cycle(self):
         fd = self.filename.open("w", newline="")
+        fd_bin = self.binary_filename.open("wb")
         csvwriter = csv.writer(fd, delimiter="\t")
         headed = False
+
+        bin_write_struct = None
 
         def form_header(sensor_number):
             header_comment = ("Time,s",
@@ -145,10 +150,12 @@ class QueueRunner():
                 self.set_meas_tuple((us, rs, sensor_resistances, sensor_states, temperatures, converted))
                 self.hold_method((sensor_resistances, rs, time_next))
                 if not headed:
-                    header_comment, header = form_header(len(rs))
+                    sensors_number = len(rs)
+                    header_comment, header = form_header(sensors_number)
                     csvwriter.writerow(header_comment)
                     csvwriter.writerow(header)
                     headed = True
+                    bin_write_struct = struct.Struct("<f" + sensors_number * 4 * "f" + "cIH" + sensors_number * "f")
                 csvwriter.writerow((time_next,
                                     # *us,
                                     # *rs,
@@ -159,6 +166,15 @@ class QueueRunner():
                                     stage_type,
                                     # *sensor_states
                                     ))
+                fd_bin.write(bin_write_struct.pack(time_next,
+                                    *us,
+                                    *rs,
+                                    *format_floats(sensor_resistances),
+                                    *format_floats(temperatures),
+                                    gas_state,
+                                    stage_num,
+                                    stage_type,
+                                    *sensor_states))
         while not self.queue.empty():
             data = self.queue.get()
             us, rs, time_next_plus_t0, time_next, temperatures, gas_state, stage_num, stage_type, sensor_states, converted = data
@@ -183,8 +199,18 @@ class QueueRunner():
                                 stage_type,
                                 # *sensor_states
                                 ))
+            fd_bin.write(bin_write_struct.pack(time_next,
+                                               *us,
+                                               *rs,
+                                               *format_floats(sensor_resistances),
+                                               *format_floats(temperatures),
+                                               gas_state,
+                                               stage_num,
+                                               stage_type,
+                                               *sensor_states))
 
         fd.close()
+        fd_bin.close()
 
     def stop(self):
         self.stopped = True
