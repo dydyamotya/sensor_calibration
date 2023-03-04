@@ -288,10 +288,11 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
 
 class MeasurementWidget(QtWidgets.QWidget):
 
-    def __init__(self, parent, level, global_settings, *args, **kwargs):
+    def __init__(self, parent, global_settings, *args, **kwargs):
         super().__init__(*args, **kwargs)
         QtWidgets.QVBoxLayout(self)
         self.settings_widget = parent.settings_widget
+        self.global_settings = global_settings
         self.widgets = []
         self.css_boxes: Optional[CssCheckBoxes] = None
         self.multirange_state = False

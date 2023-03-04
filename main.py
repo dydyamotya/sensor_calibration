@@ -113,7 +113,7 @@ def main():
     central_widget = QtWidgets.QTabWidget()
     main_window.setCentralWidget(central_widget)
 
-    window = MeasurementWidget(main_window, level, settings)
+    window = MeasurementWidget(main_window, settings)
     central_widget.addTab(window, "Measurement")
 
     window = OperationWidget(main_window, settings, window)
