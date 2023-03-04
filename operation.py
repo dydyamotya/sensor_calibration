@@ -73,12 +73,13 @@ class LinesDrawButton(QtWidgets.QPushButton):
 
 
 class QueueRunner():
-    def __init__(self, queue: Queue, converters_func_voltage_to_r):
+    def __init__(self, queue: Queue, converters_func_voltage_to_r, save_folder):
         self.queue = queue
         self.thread = None
         self.hold_method = None
         self.stopped = True
         self.filename = None
+        self.save_folder = save_folder
         self.converter_funcs_dicts = converters_func_voltage_to_r
         self._meas_values_tuple = None
         self.meas_tuple_lock = threading.Lock()
@@ -101,9 +102,9 @@ class QueueRunner():
         if self.hold_method is not None and self.stopped:
             self.stopped = False
             self.thread = threading.Thread(target=self.cycle)
-            self.filename = (pathlib.Path("./tests") / datetime.datetime.now().strftime("%Y%m%d-%H%M%S")).with_suffix(
+            self.filename = (pathlib.Path(self.save_folder) / datetime.datetime.now().strftime("%Y%m%d-%H%M%S")).with_suffix(
                 ".txt")
-            self.binary_filename = (pathlib.Path("./tests") / datetime.datetime.now().strftime("%Y%m%d-%H%M%S")).with_suffix(".dat")
+            self.binary_filename = (pathlib.Path(self.save_folder) / datetime.datetime.now().strftime("%Y%m%d-%H%M%S")).with_suffix(".dat")
             self.thread.start()
 
     def join(self):
@@ -185,7 +186,8 @@ class OperationWidget(QtWidgets.QWidget):
         self.runner = None
         self.generator = None
         self.queue = Queue()
-        self.queue_runner = QueueRunner(self.queue, self.measurement_widget.get_voltage_to_resistance_funcs)
+        save_folder = self.global_settings.value("operation_widget_save_path", "./tests")
+        self.queue_runner = QueueRunner(self.queue, self.measurement_widget.get_voltage_to_resistance_funcs, save_folder)
         self.settings = self.parent_py.settings_widget
         self.settings.redraw_signal.connect(self.refresh_state)
         layout = QtWidgets.QVBoxLayout(self)
