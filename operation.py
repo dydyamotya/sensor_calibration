@@ -167,27 +167,15 @@ class QueueRunner():
                                     stage_type,
                                     # *sensor_states
                                     ))
-                try:
-                    fd_bin.write(bin_write_struct.pack(time_next,
+                fd_bin.write(bin_write_struct.pack(time_next,
                                     *us,
                                     *rs,
-                                    *format_floats(sensor_resistances),
-                                    *format_floats(temperatures),
+                                    *sensor_resistances,
+                                    *temperatures,
                                     gas_state,
                                     stage_num,
                                     stage_type,
                                     *sensor_states))
-                except:
-                    print((time_next,
-                                    *us,
-                                    *rs,
-                                    *format_floats(sensor_resistances),
-                                    *format_floats(temperatures),
-                                    gas_state,
-                                    stage_num,
-                                    stage_type,
-                                    *sensor_states))
-                    raise
         while not self.queue.empty():
             data = self.queue.get()
             us, rs, time_next_plus_t0, time_next, temperatures, gas_state, stage_num, stage_type, sensor_states, converted = data
@@ -215,8 +203,8 @@ class QueueRunner():
             fd_bin.write(bin_write_struct.pack(time_next,
                                                *us,
                                                *rs,
-                                               *format_floats(sensor_resistances),
-                                               *format_floats(temperatures),
+                                               *sensor_resistances,
+                                               *temperatures,
                                                gas_state,
                                                stage_num,
                                                stage_type,
