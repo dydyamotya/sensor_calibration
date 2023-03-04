@@ -348,7 +348,6 @@ class OperationWidget(QtWidgets.QWidget):
     def start(self):
         if self.load_label.text() == "Loaded":
             self.refresh_state()
-            self.settings.start_program_signal.emit(1)
             self.load_program_button.setEnabled(False)
             comport, sensor_number, multirange, *_ = self.settings.get_variables()
             self.runner = ProgramRunner(
@@ -368,6 +367,8 @@ class OperationWidget(QtWidgets.QWidget):
             self.timer_plot.start()
             self.values_set_timer.setInterval(int(self.generator.program.settings.step * 500))
             self.values_set_timer.start()
+            self.settings.start_program_signal.emit(1)
+
 
     def stop(self):
         if self.runner is not None:
