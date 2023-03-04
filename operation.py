@@ -156,6 +156,7 @@ class QueueRunner():
                     csvwriter.writerow(header)
                     headed = True
                     bin_write_struct = struct.Struct("<f" + sensors_number * 4 * "f" + "cIH" + sensors_number * "f")
+                    fd_bin.write(struct.pack("<c", sensors_number))
                 csvwriter.writerow((time_next,
                                     # *us,
                                     # *rs,
