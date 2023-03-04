@@ -155,7 +155,7 @@ class QueueRunner():
                     csvwriter.writerow(header_comment)
                     csvwriter.writerow(header)
                     headed = True
-                    bin_write_struct = struct.Struct("<f" + sensors_number * 4 * "f" + "cIH" + sensors_number * "f")
+                    bin_write_struct = struct.Struct("<f" + sensors_number * 4 * "f" + "BIH" + sensors_number * "B")
                     fd_bin.write(struct.pack("<B", sensors_number))
                 csvwriter.writerow((time_next,
                                     # *us,
@@ -167,7 +167,8 @@ class QueueRunner():
                                     stage_type,
                                     # *sensor_states
                                     ))
-                fd_bin.write(bin_write_struct.pack(time_next,
+                try:
+                    fd_bin.write(bin_write_struct.pack(time_next,
                                     *us,
                                     *rs,
                                     *format_floats(sensor_resistances),
@@ -176,6 +177,17 @@ class QueueRunner():
                                     stage_num,
                                     stage_type,
                                     *sensor_states))
+                except:
+                    print((time_next,
+                                    *us,
+                                    *rs,
+                                    *format_floats(sensor_resistances),
+                                    *format_floats(temperatures),
+                                    gas_state,
+                                    stage_num,
+                                    stage_type,
+                                    *sensor_states))
+                    raise
         while not self.queue.empty():
             data = self.queue.get()
             us, rs, time_next_plus_t0, time_next, temperatures, gas_state, stage_num, stage_type, sensor_states, converted = data
