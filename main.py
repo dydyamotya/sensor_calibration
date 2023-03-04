@@ -3,8 +3,9 @@ import argparse
 import logging
 
 from choosebestcomb import ChooseBestCombinationOfSensorsWidget
-from equipment_settings import EquipmentSettings
+from equipment_settings import EquipmentSettings, PathsWidget
 from plotter import ExperimentPlotter
+from converter import ConverterWidget
 from u_calibration import UCalibrationWidget, ImportCalibrationWidget
 from calibration import CalibrationWidget
 from measurement import MeasurementWidget
@@ -74,22 +75,28 @@ def main():
 
     menu_bar = main_window.menuBar()
 
+    settings_menu = menu_bar.addMenu("Settings")
     main_window.settings_widget = EquipmentSettings(settings, main_window)
     logger.debug("After equipment setting init")
     action = QtWidgets.QAction("Settings", main_window)
     action.triggered.connect(main_window.settings_widget.toggle_visibility)
-    menu_bar.addAction(action)
+    settings_menu.addAction(action)
 
     main_window.gasstate_widget = GasStateWidget(settings, main_window)
     logger.debug("After gasstate init")
     action = QtWidgets.QAction("GasState Server", main_window)
     action.triggered.connect(main_window.gasstate_widget.toggle_visibility)
-    menu_bar.addAction(action)
+    settings_menu.addAction(action)
 
     main_window.import_widget = ImportCalibrationWidget(settings, main_window)
     action = QtWidgets.QAction("Import", main_window)
     action.triggered.connect(main_window.import_widget.toggle_visibility)
-    menu_bar.addAction(action)
+    settings_menu.addAction(action)
+
+    main_window.paths_widget = PathsWidget(settings)
+    action = QtWidgets.QAction("Paths", main_window)
+    action.triggered.connect(main_window.paths_widget.toggle_visibility)
+    settings_menu.addAction(action)
 
     plotter_menu = menu_bar.addMenu("Plotter")
     main_window.plotter_experiment_widget = ExperimentPlotter()
@@ -97,13 +104,19 @@ def main():
     action.triggered.connect(main_window.plotter_experiment_widget.toggle_visibility)
     plotter_menu.addAction(action)
 
+    converter_menu = menu_bar.addMenu("Converter")
+    main_window.converter_widget = ConverterWidget(settings)
+    action = QtWidgets.QAction("Binary converter", main_window)
+    action.triggered.connect(main_window.converter_widget.toggle_visibility)
+    converter_menu.addAction(action)
+
     central_widget = QtWidgets.QTabWidget()
     main_window.setCentralWidget(central_widget)
 
     window = MeasurementWidget(main_window, level, settings)
     central_widget.addTab(window, "Measurement")
 
-    window = OperationWidget(main_window, level, settings, window)
+    window = OperationWidget(main_window, settings, window)
     central_widget.addTab(window, "Operation")
 
     window = CalibrationWidget(main_window, level, settings)

@@ -12,6 +12,7 @@ import numpy as np
 import numpy.ma as ma
 
 import logging
+import pathlib
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,7 @@ class CalibrationWidget(QtWidgets.QWidget):
         super().__init__()
         self.setWindowTitle("Calibration")
         self.parent_py = parent
+        self.global_settings = global_settings
         self.log_level = log_level
 
         self.stopped = True
@@ -517,6 +519,7 @@ class SaveButtons(QtWidgets.QWidget):
         super().__init__(parent)
 
         self.parent_py: CalibrationWidget = parent
+        self.global_settings = parent.global_settings
 
         layout = QtWidgets.QHBoxLayout(self)
 
@@ -545,9 +548,10 @@ class SaveButtons(QtWidgets.QWidget):
 
     def save_calibration(self):
         filename, filters = QtWidgets.QFileDialog.getSaveFileName(
-            self, "Save Calibration", "./tests", "Calibration File (*.cal)"
+            self, "Save Calibration", self.global_settings.value("calibration_widget_cal_path", "./tests"), "Calibration File (*.cal)"
         )
         if filename:
+            self.global_settings.setValue("calibration_widget_cal_path", pathlib.Path(filename).parent.as_posix())
             voltages, _, temperatures = self.parent_py.get_data()
             items = voltages.shape[1]
             with open(filename, "w") as fd:
@@ -563,10 +567,13 @@ class SaveButtons(QtWidgets.QWidget):
 
     def save_parameters(self):
         filename, filters = QtWidgets.QFileDialog.getSaveFileName(
-            self, "Save Parameters", "./tests", "Parameters File (*.par)"
+            self, "Save Parameters",
+            self.global_settings.value("calibration_widget_par_path", "./tests"),
+            "Parameters File (*.par)"
         )
         if not filename:
             return
+        self.global_settings.setValue("calibration_widget_par_path", pathlib.Path(filename).parent.as_posix())
 
         config = configparser.ConfigParser()
         r0s, rns, alphas, t0, Vmax = self.parent_py.get_params()
@@ -591,10 +598,13 @@ class SaveButtons(QtWidgets.QWidget):
 
     def load_parameters(self):
         filename, filters = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Load Parameters", "./tests", "Parameters File (*.par)"
+            self, "Load Parameters",
+            self.global_settings.value("calibration_widget_par_path", "./tests"),
+            "Parameters File (*.par)"
         )
         if not filename:
             return
+        self.global_settings.setValue("calibration_widget_par_path", pathlib.Path(filename).parent.as_posix())
         config = configparser.ConfigParser()
 
         config.read(filename)
@@ -603,19 +613,25 @@ class SaveButtons(QtWidgets.QWidget):
 
     def save_resistances(self):
         filename, filters = QtWidgets.QFileDialog.getSaveFileName(
-            self, "Save Resistances", "./tests", "Resistances File (*.npz)"
+            self, "Save Resistances",
+            self.global_settings.value("calibration_widget_res_path", "./tests"),
+            "Resistances File (*.npz)"
         )
         if not filename:
             return
+        self.global_settings.setValue("calibration_widget_res_path", pathlib.Path(filename).parent.as_posix())
         voltages, resistances, temperatures = self.parent_py.get_data()
         np.savez(filename, voltages=voltages, resistances=resistances, temperatures=temperatures)
 
     def load_resistances(self):
         filename, filters = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Load Resistances", "./tests", "Resistances File (*.npz)"
+            self, "Load Resistances",
+            self.global_settings.value("calibration_widget_res_path", "./tests"),
+            "Resistances File (*.npz)"
         )
         if not filename:
             return
+        self.global_settings.setValue("calibration_widget_res_path", pathlib.Path(filename).parent.as_posix())
         npzfile = np.load(filename)
         logger.debug("File loaded")
         voltages, resistances = npzfile["voltages"], npzfile["resistances"]

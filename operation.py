@@ -111,32 +111,10 @@ class QueueRunner():
             self.thread.join()
 
     def cycle(self):
-        fd = self.filename.open("w", newline="")
         fd_bin = self.binary_filename.open("wb")
-        csvwriter = csv.writer(fd, delimiter="\t")
         headed = False
 
         bin_write_struct = None
-
-        def form_header(sensor_number):
-            header_comment = ("Time,s",
-                              # *(f"U{idx},V" for idx in range(sensor_number)),
-                              # *(f"Rn{idx},Ohm" for idx in range(sensor_number)),
-                              *(f"Rs{idx},Ohm" for idx in range(sensor_number)),
-                              *(f"T{idx},C" for idx in range(sensor_number)),
-                              "gas_state", "stage_num", "stage_type",
-                              # *(f"State{idx}" for idx in range(sensor_number))
-                              )
-            header = ("Time",
-                      # *(f"U{idx}" for idx in range(sensor_number)),
-                      # *(f"Rn{idx}" for idx in range(sensor_number)),
-                      *(f"Rs{idx}" for idx in range(sensor_number)),
-                      *(f"T{idx}" for idx in range(sensor_number)),
-                      "gas_state", "stage_num", "stage_type",
-                      # *(f"State{idx}" for idx in range(sensor_number))
-                      )
-            return header_comment, header
-
         converter_funcs = self.converter_funcs_dicts()
         while not self.stopped:
             sleep(0.02)
@@ -151,22 +129,9 @@ class QueueRunner():
                 self.hold_method((sensor_resistances, rs, time_next))
                 if not headed:
                     sensors_number = len(rs)
-                    header_comment, header = form_header(sensors_number)
-                    csvwriter.writerow(header_comment)
-                    csvwriter.writerow(header)
                     headed = True
                     bin_write_struct = struct.Struct("<f" + sensors_number * 4 * "f" + "BIH" + sensors_number * "B")
                     fd_bin.write(struct.pack("<B", sensors_number))
-                csvwriter.writerow((time_next,
-                                    # *us,
-                                    # *rs,
-                                    *format_floats(sensor_resistances),
-                                    *format_floats(temperatures),
-                                    gas_state,
-                                    stage_num,
-                                    stage_type,
-                                    # *sensor_states
-                                    ))
                 fd_bin.write(bin_write_struct.pack(time_next,
                                     *us,
                                     *rs,
@@ -186,20 +151,10 @@ class QueueRunner():
             self.set_meas_tuple((us, rs, sensor_resistances, sensor_states, temperatures, converted))
             self.hold_method((sensor_resistances, rs, time_next))
             if not headed:
-                header_comment, header = form_header(len(rs))
-                csvwriter.writerow(header_comment)
-                csvwriter.writerow(header)
+                sensors_number = len(rs)
                 headed = True
-            csvwriter.writerow((time_next,
-                                # *us,
-                                # *rs,
-                                *format_floats(sensor_resistances),
-                                *format_floats(temperatures),
-                                gas_state,
-                                stage_num,
-                                stage_type,
-                                # *sensor_states
-                                ))
+                bin_write_struct = struct.Struct("<f" + sensors_number * 4 * "f" + "BIH" + sensors_number * "B")
+                fd_bin.write(struct.pack("<B", sensors_number))
             fd_bin.write(bin_write_struct.pack(time_next,
                                                *us,
                                                *rs,
@@ -210,7 +165,6 @@ class QueueRunner():
                                                stage_type,
                                                *sensor_states))
 
-        fd.close()
         fd_bin.close()
 
     def stop(self):
@@ -221,10 +175,11 @@ class OperationWidget(QtWidgets.QWidget):
     stop_signal = Signal()
     running_signal = Signal()
 
-    def __init__(self, parent, log_level, global_settings, measurement_widget,
+    def __init__(self, parent, global_settings, measurement_widget,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.parent_py = parent
+        self.global_settings = global_settings
         self.measurement_widget = measurement_widget
         self.gasstate_widget = parent.gasstate_widget
         self.runner = None
@@ -384,11 +339,14 @@ class OperationWidget(QtWidgets.QWidget):
 
     def load_program(self):
         filename, filter = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Open program", "./tests", "Program file (*.yaml)")
+            self, "Open program",
+            self.global_settings.value("operation_widget_programs_path", "./tests"),
+            "Program file (*.yaml)")
         if not filename:
             self.load_label.setText("Not loaded")
             self.load_label.setStyleSheet("background-color:pink")
             return
+        self.global_settings.setValue("operation_widget_programs_path", pathlib.Path(filename).parent.as_posix()),
         try:
             loaded = yaml.load(pathlib.Path(filename).read_text(), yaml.Loader)
         except:

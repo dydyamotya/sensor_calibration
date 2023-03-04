@@ -1,6 +1,6 @@
 import PySide2.QtGui
 from PySide2 import QtWidgets, QtCore
-from PySide2.QtCore import Signal
+from PySide2.QtCore import Signal, QEvent
 from PySide2.QtGui import QPixmap, QColor
 
 import numpy as np
@@ -128,5 +128,28 @@ class PlotCalibrationWidget(QtWidgets.QWidget):
         screen = QtWidgets.QDesktopWidget().screenGeometry()
         self.move(screen.width() / 2, screen.height() / 2)
         self.show()
+
+class FileDialogLineEdit(QtWidgets.QLineEdit):
+    def __init__(self, global_settings, name, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.global_settings = global_settings
+        self.name = name
+        self.returnPressed.connect(self.return_pressed_callback)
+
+    def event(self, event: PySide2.QtCore.QEvent) -> bool:
+        if event.type() == QEvent.Type.MouseButtonDblClick:
+            self.return_pressed_callback()
+        return super().event(event)
+
+    def return_pressed_callback(self):
+        dirname = QtWidgets.QFileDialog.getExistingDirectory(
+            self,
+            "Choose path",
+            self.global_settings.value(self.name, "./tests")
+        )
+        if dirname:
+            self.global_settings.setValue(self.name, dirname)
+            self.setText(dirname)
+
 
 

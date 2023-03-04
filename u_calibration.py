@@ -11,6 +11,7 @@ import logging
 import pyqtgraph as pg
 from models import SensorPosition
 from misc import clear_layout
+import pathlib
 
 logger = logging.getLogger(__name__)
 
@@ -373,13 +374,14 @@ class ImportCalibrationWidget(QtWidgets.QWidget):
 
     def set_load_file(self):
         filename, filters = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Load parameters", "./tests", "Init files (*.ini)")
+            self, "Load parameters", self.global_settings.value("import_calibration_widget", "./tests"), "Init files (*.ini)")
         if not filename:
             message_box = QtWidgets.QMessageBox()
             message_box.setText("No file selected")
             message_box.exec_()
             return
 
+        self.global_settings.setValue("import_calibration_widget", pathlib.Path(filename).parent.as_posix())
         self.load_file_lineedit.setText(filename)
 
     def configure_load_file(self, sens_num, r4, rs_u1, rs_u2):
@@ -416,10 +418,15 @@ class ImportCalibrationWidget(QtWidgets.QWidget):
 
     def import_parameters(self):
         filename, filters = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Load parameters", "./tests", "Init files (*.ini)")
+            self, "Load parameters",
+            self.global_settings.value("import_calibration_widget", "./tests"), "Init files (*.ini)")
         if not filename:
             return
+
+        self.global_settings.setValue("import_calibration_widget", pathlib.Path(filename).parent.as_posix())
+
         config = configparser.ConfigParser()
+
 
         ded = 0
 

@@ -13,6 +13,7 @@ from PySide2 import QtWidgets, QtCore, QtGui
 import logging
 from models import SensorPosition, fn, Machine
 from misc import clear_layout, CssCheckBoxes, PlotCalibrationWidget
+import pathlib
 
 logger = logging.getLogger(__name__)
 
@@ -356,9 +357,11 @@ class MeasurementWidget(QtWidgets.QWidget):
 
     def load_calibration(self):
         filename, filters = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Open Calibration File", "./tests",
+            self, "Open Calibration File",
+            self.global_settings.value("calibration_widget_res_path", "./tests"),
             "Resistances File (*.npz)")
         if filename:
+            self.global_settings.setValue("calibration_widget_res_path", pathlib.Path(filename).parent.as_posix())
             npzfile = np.load(filename)
             try:
                 voltages, resistances, temperatures = npzfile[
