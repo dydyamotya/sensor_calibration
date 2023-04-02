@@ -285,8 +285,20 @@ class MS_Uni():
         self.ms.recieve_measurement_range_answer()
 
     def full_request(self, values, request_type = MS_ABC.REQUEST_U, sensor_types_list = None):
+        values = list(values)
         if sensor_types_list is None:
             sensor_types_list = []
+        if request_type == MS_ABC.REQUEST_U:
+            for sensor_type in sensor_types_list:
+                if sensor_type == MS_ABC.SEND_CSS_1_4:
+                    for i in range(0, 4):
+                        values[i] = min(4, values[i])
+                if sensor_type == MS_ABC.SEND_CSS_5_8:
+                    for i in range(4, 8):
+                        values[i] = min(4, values[i])
+                if sensor_type == MS_ABC.SEND_CSS_9_12:
+                    for i in range(8, 12):
+                        values[i] = min(4, values[i])
         return self.ms.full_request(values[:self.sensors_number], request_type, sensor_types_list)
 
     def clear_state(self, sensor_types_list=None):
