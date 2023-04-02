@@ -1,19 +1,16 @@
+import logging
+import pathlib
 from typing import Collection, Optional
 
-from PySide2.QtWidgets import QFrame
-from yaml import load, dump
-from collections import UserDict
 import numpy as np
-from scipy.optimize import curve_fit
+from PySide2 import QtWidgets, QtCore
+from PySide2.QtWidgets import QFrame
 from scipy.interpolate import interp1d
 from scipy.stats import linregress
-from sensor_system import MS_ABC
 
-from PySide2 import QtWidgets, QtCore, QtGui
-import logging
+from misc import clear_layout, CssCheckBoxes, PlotCalibrationWidget, find_index_of_last_non_repeatative_element
 from models import SensorPosition, fn, Machine
-from misc import clear_layout, CssCheckBoxes, PlotCalibrationWidget
-import pathlib
+from sensor_system import MS_ABC
 
 logger = logging.getLogger(__name__)
 
@@ -148,9 +145,12 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
         self._init_sensor_position(sensor_position)
 
     def load_calibration(self, voltages, resistances, temperatures):
-        self.voltages = voltages
-        self.resistances = resistances
-        self.temperatures = temperatures
+        non_rep_index = find_index_of_last_non_repeatative_element(voltages) + 1
+
+        self.voltages = voltages[:non_rep_index]
+        self.resistances = resistances[:non_rep_index]
+        self.temperatures = temperatures[:non_rep_index]
+
 
         logger.debug(f"{self.temperatures[:5]} .. {self.temperatures[-5:]}")
         logger.debug(f"{self.voltages[:5]} .. {self.voltages[-5:]}")

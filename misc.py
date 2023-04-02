@@ -153,3 +153,12 @@ class FileDialogLineEdit(QtWidgets.QLineEdit):
 
 
 
+def find_index_of_last_non_repeatative_element(array):
+    prev_element = array[0] - 1
+    for idx, elem in enumerate(array):
+        if elem == prev_element:
+            return idx - 1
+        else:
+            prev_element = elem
+    else:
+        return idx
