@@ -159,12 +159,11 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
             self.func_T_to_U = interp1d(self.temperatures,
                                         self.voltages,
                                         kind="cubic")
-        except ValueError:
+        except ValueError as e:
             logger.debug(
                 f"Calibration T_to_U loading failed for {self.sensor_num} {self.machine_name} sensor"
             )
-            # logger.debug(f"Voltages: {self.voltages}")
-            # logger.debug(f"Temperatures: {self.temperatures}")
+            logger.debug(str(e))
             self.func_T_to_U = lambda x: 0
         else:
             logger.debug(
