@@ -18,6 +18,10 @@ values_for_css_boxes = [
     MS_ABC.SEND_CSS_1_4, MS_ABC.SEND_CSS_5_8, MS_ABC.SEND_CSS_9_12
 ]
 
+def find_first_negative(array):
+    for idx, i in enumerate(reversed(array)):
+        if i <= 0:
+            return array.shape[0] - idx
 
 class SensorPositionWidget(QtWidgets.QGroupBox):
 
@@ -147,14 +151,23 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
     def load_calibration(self, voltages, resistances, temperatures):
         non_rep_index = find_index_of_last_non_repeatative_element(voltages) + 1
 
-        self.voltages = voltages[:non_rep_index]
-        self.resistances = resistances[:non_rep_index]
-        self.temperatures = temperatures[:non_rep_index]
+        voltages = voltages[:non_rep_index]
+        resistances = resistances[:non_rep_index]
+        temperatures = temperatures[:non_rep_index]
+
+        non_neg_diff_index = find_first_negative(np.diff(temperatures)) + 1
+
+        self.voltages = voltages[non_neg_diff_index:]
+        self.resistances = resistances[non_neg_diff_index:]
+        self.temperatures = temperatures[non_neg_diff_index:]
 
 
         logger.debug(f"{self.temperatures[:5]} .. {self.temperatures[-5:]}")
         logger.debug(f"{self.voltages[:5]} .. {self.voltages[-5:]}")
         logger.debug(f"{self.resistances[:5]} .. {self.resistances[-5:]}")
+
+
+
         try:
             self.func_T_to_U = interp1d(self.temperatures,
                                         self.voltages,
