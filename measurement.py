@@ -1,6 +1,6 @@
 import logging
 import pathlib
-from typing import Collection, Optional
+from typing import Collection, Optional, TYPE_CHECKING
 
 import numpy as np
 from PySide2 import QtWidgets, QtCore
@@ -11,6 +11,9 @@ from scipy.stats import linregress
 from misc import clear_layout, CssCheckBoxes, PlotCalibrationWidget, find_index_of_last_non_repeatative_element
 from models import SensorPosition, fn, Machine
 from sensor_system import MS_ABC
+ 
+if TYPE_CHECKING:
+    from equipment_settings import EquipmentSettings
 
 logger = logging.getLogger(__name__)
 
@@ -303,7 +306,7 @@ class MeasurementWidget(QtWidgets.QWidget):
     def __init__(self, parent, global_settings, *args, **kwargs):
         super().__init__(*args, **kwargs)
         QtWidgets.QVBoxLayout(self)
-        self.settings_widget = parent.settings_widget
+        self.settings_widget: EquipmentSettings = parent.settings_widget
         self.global_settings = global_settings
         self.widgets = []
         self.css_boxes: Optional[CssCheckBoxes] = None

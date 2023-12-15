@@ -17,7 +17,10 @@ import numpy as np
 import threading
 import pyqtgraph as pg
 from queue import Queue
-import csv
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from equipment_settings import EquipmentSettings
 
 logger = logging.getLogger(__name__)
 
@@ -188,7 +191,7 @@ class OperationWidget(QtWidgets.QWidget):
         self.queue = Queue()
         save_folder = self.global_settings.value("operation_widget_save_path", "./tests")
         self.queue_runner = QueueRunner(self.queue, self.measurement_widget.get_voltage_to_resistance_funcs, save_folder)
-        self.settings = self.parent_py.settings_widget
+        self.settings: EquipmentSettings = self.parent_py.settings_widget
         self.settings.redraw_signal.connect(self.refresh_state)
         layout = QtWidgets.QVBoxLayout(self)
         self.timer_plot = QTimer()

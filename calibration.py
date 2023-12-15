@@ -7,6 +7,10 @@ from misc import TypeCheckLineEdit, clear_layout, CssCheckBoxes
 import time
 import configparser
 import pyqtgraph as pg
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from equipment_settings import EquipmentSettings
 
 import numpy as np
 import numpy.ma as ma
