@@ -21,6 +21,8 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from equipment_settings import EquipmentSettings
+    from main_window import MyMainWindow
+    from measurement import MeasurementWidget
 
 logger = logging.getLogger(__name__)
 
@@ -179,7 +181,10 @@ class OperationWidget(QtWidgets.QWidget):
     stop_signal = Signal()
     running_signal = Signal()
 
-    def __init__(self, parent, global_settings, measurement_widget,
+    def __init__(self,
+                 parent: "MyMainWindow",
+                 global_settings: QtCore.QSettings,
+                 measurement_widget: "MeasurementWidget",
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.parent_py = parent
@@ -360,11 +365,6 @@ class OperationWidget(QtWidgets.QWidget):
             raise
         else:
             self.generator = ProgramGenerator(loaded)
-            # logger.debug(f"Parsing started {datetime.datetime.now()}")
-            # with open("./tests/parsed.txt", "w") as fd:
-            #     for time_, values in self.generator.parse_program_to_queue():
-            #         fd.write(f"{time_}, {values}\n")
-            # logger.debug(f"Parsing stopped {datetime.datetime.now()}")
             self.load_label.setText("Loaded")
             self.load_label.setStyleSheet("background-color:palegreen")
 

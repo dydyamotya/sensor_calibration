@@ -63,10 +63,10 @@ def main():
     central_widget = QtWidgets.QTabWidget()
     main_window.setCentralWidget(central_widget)
 
-    window = MeasurementWidget(main_window, settings)
-    central_widget.addTab(window, "Measurement")
+    measurement_widget = MeasurementWidget(main_window, settings)
+    central_widget.addTab(measurement_widget, "Measurement")
 
-    window = OperationWidget(main_window, settings, window)
+    window = OperationWidget(main_window, settings, measurement_widget)
     central_widget.addTab(window, "Operation")
 
     window = CalibrationWidget(main_window, level, settings)

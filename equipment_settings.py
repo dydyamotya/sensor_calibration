@@ -22,21 +22,32 @@ class EquipmentSettings(QtWidgets.QWidget):
         self.start_program_signal.connect(self.process_start_program_signal)
 
         self.machine_name_widget = DatabaseLeaderComboboxWidget(Machine, "name")
+
         layout.addRow("Machine name:", self.machine_name_widget)
 
-        self.comport_widget = DatabaseNonleaderComboboxWidget(self.machine_name_widget, "last_port", comports_list(),
+        self.comport_widget = DatabaseNonleaderComboboxWidget(self.machine_name_widget,
+                                                              "last_port",
+                                                              comports_list(),
                                                               comports_list())
         layout.addRow("Port:", self.comport_widget)
 
-        self.sensor_number_widget = DatabaseNonleaderComboboxWidget(self.machine_name_widget, "sensors_number",
-                                                                    ["4", "12"], [4, 12])
+        self.sensor_number_widget = DatabaseNonleaderComboboxWidget(self.machine_name_widget,
+                                                                    "sensors_number",
+                                                                    ["4", "12"],
+                                                                    [4, 12])
+
         layout.addRow("Sensor number:", self.sensor_number_widget)
 
-        self.multirange_widget = DatabaseNonleaderComboboxWidget(self.machine_name_widget, "multirange", ["yes", "no"],
+        self.multirange_widget = DatabaseNonleaderComboboxWidget(self.machine_name_widget,
+                                                                 "multirange",
+                                                                 ["yes", "no"],
                                                                  [1, 0])
+
         layout.addRow("Multirange:", self.multirange_widget)
 
-        self.modes_widget = DatabaseNonleaderTableWidget(self.machine_name_widget, "modes")
+        self.modes_widget = DatabaseNonleaderTableWidget(self.machine_name_widget,
+                                                         "modes")
+
         layout.addRow("Modes:", self.modes_widget)
 
         self.machine_name_widget.enter_hit_signal.connect(self.comport_widget.on_leader_value_change)

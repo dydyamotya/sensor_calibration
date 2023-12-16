@@ -1,6 +1,6 @@
 import logging
 import pathlib
-from typing import Collection, Optional, TYPE_CHECKING
+from typing import Collection, Optional, TYPE_CHECKING, List
 
 import numpy as np
 from PySide2 import QtWidgets, QtCore
@@ -14,6 +14,7 @@ from sensor_system import MS_ABC
  
 if TYPE_CHECKING:
     from equipment_settings import EquipmentSettings
+    from main_window import MyMainWindow
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +29,16 @@ def find_first_negative(array):
 
 class SensorPositionWidget(QtWidgets.QGroupBox):
 
-    def __init__(self, parent, sensor_num, machine_name, r4_str_values, r4_to_float, r4_to_int):
+    def __init__(self,
+                 parent,
+                 sensor_num,
+                 machine_name,
+                 r4_str_values,
+                 r4_to_float,
+                 r4_to_int,
+                 multirange: str):
         super(SensorPositionWidget, self).__init__(parent)
-        self.sensor_positions: Optional[Collection[Optional[SensorPosition]]] = None
+        self.sensor_positions: Optional[List[Optional[SensorPosition]]] = None
         self.sensor_num = sensor_num
         self.machine_name = machine_name
         self.temperatures_loaded = False
@@ -40,6 +48,7 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
         self.r4_str_values = r4_str_values
         self.r4_to_float = r4_to_float
         self.r4_to_int = r4_to_int
+        self.multirange = multirange
         self._init_ui()
 
     def _get_sensor_positions_from_db(self):
@@ -50,7 +59,7 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
                 Machine.id).where(Machine.name == machine_name).get()
             self.sensor_positions = list(
                 SensorPosition.select(SensorPosition, fn.MAX(
-                    SensorPosition.id)).where(
+                    SensorPosition.datetime)).where(
                     (SensorPosition.machine == machine_id)
                     & (SensorPosition.sensor_num == sensor_num +
                        1)).group_by(SensorPosition.r4))
@@ -91,41 +100,63 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
         if self.sensor_positions is None or len(self.sensor_positions) == 0:
             layout.addWidget(QtWidgets.QLabel("No data"))
         else:
-            r4s = [
-                sensor_position.r4 for sensor_position in self.sensor_positions
-            ]
-            self.r4_positions = QtWidgets.QComboBox()
-            positions_r4s_combobox = self.r4_positions
-            if self.resistances_convertors_loaded and len(self.sensor_positions) == 3:
-                positions_r4s_combobox.setStyleSheet("background-color:palegreen")
-            elif self.resistances_convertors_loaded and len(self.sensor_positions) < 3:
-                positions_r4s_combobox.setStyleSheet("background-color:palegoldenrod")
+            if self.multirange:
+                r4s = [
+                    sensor_position.r4 for sensor_position in self.sensor_positions
+                ]
+                self.r4_positions = QtWidgets.QComboBox()
+                positions_r4s_combobox = self.r4_positions
+                if self.resistances_convertors_loaded and len(self.sensor_positions) == 3:
+                    positions_r4s_combobox.setStyleSheet("background-color:palegreen")
+                elif self.resistances_convertors_loaded and len(self.sensor_positions) < 3:
+                    positions_r4s_combobox.setStyleSheet("background-color:palegoldenrod")
+                else:
+                    positions_r4s_combobox.setStyleSheet("background-color:pink")
+                positions_r4s_combobox.addItems(r4s)
+                positions_r4s_combobox.currentTextChanged.connect(
+                    self.choose_sensor_range)
+                layout.addWidget(positions_r4s_combobox)
+
+                buttons_layout = QtWidgets.QHBoxLayout()
+                layout.addLayout(buttons_layout, stretch=0)
+
+                sensor_position_layout = QtWidgets.QFormLayout()
+                layout.addLayout(sensor_position_layout, stretch=1)
+                sensor_position_layout.addRow("Machine name",
+                                              QtWidgets.QLabel(f"{machine_name}"))
+                self.labels = {
+                    label: QtWidgets.QLabel()
+                    for label in ("rs_u1", "rs_u2", "datetime")
+                }
+                for label, label_widget in self.labels.items():
+                    sensor_position_layout.addRow(label, label_widget)
+
+                self.choose_sensor_range(positions_r4s_combobox.currentText())
+
+                button_calibration_draw = QtWidgets.QPushButton("Draw calibration")
+                button_calibration_draw.clicked.connect(self.draw_calibration)
+                layout.addWidget(button_calibration_draw)
             else:
-                positions_r4s_combobox.setStyleSheet("background-color:pink")
-            positions_r4s_combobox.addItems(r4s)
-            positions_r4s_combobox.currentTextChanged.connect(
-                self.choose_sensor_range)
-            layout.addWidget(positions_r4s_combobox)
+                if len(self.sensor_positions) > 1:
+                    logger.warning("More than one sensor position for onerange machine")
+                sensor_position = self.sensor_positions[0]
+                self.r4_label = QtWidgets.QLabel(str(sensor_position.r4))
+                layout.addWidget(self.r4_label)
+                buttons_layout = QtWidgets.QHBoxLayout()
+                layout.addLayout(buttons_layout, stretch=0)
 
-            buttons_layout = QtWidgets.QHBoxLayout()
-            layout.addLayout(buttons_layout, stretch=0)
+                sensor_position_layout = QtWidgets.QFormLayout()
+                layout.addLayout(sensor_position_layout, stretch=1)
+                sensor_position_layout.addRow("Machine name",
+                                              QtWidgets.QLabel(f"{machine_name}"))
+                self.labels = {
+                    label: QtWidgets.QLabel()
+                    for label in ("rs_u1", "rs_u2", "datetime")
+                }
+                for label, label_widget in self.labels.items():
+                    sensor_position_layout.addRow(label, label_widget)
+                self.choose_sensor_range(self.r4_label.text())
 
-            sensor_position_layout = QtWidgets.QFormLayout()
-            layout.addLayout(sensor_position_layout, stretch=1)
-            sensor_position_layout.addRow("Machine name",
-                                          QtWidgets.QLabel(f"{machine_name}"))
-            self.labels = {
-                label: QtWidgets.QLabel()
-                for label in ("rs_u1", "rs_u2", "datetime")
-            }
-            for label, label_widget in self.labels.items():
-                sensor_position_layout.addRow(label, label_widget)
-
-            self.choose_sensor_range(positions_r4s_combobox.currentText())
-
-            button_calibration_draw = QtWidgets.QPushButton("Draw calibration")
-            button_calibration_draw.clicked.connect(self.draw_calibration)
-            layout.addWidget(button_calibration_draw)
         layout.addStretch()
 
     def _init_sensor_position(self, sensor_position):
@@ -303,12 +334,12 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
 
 class MeasurementWidget(QtWidgets.QWidget):
 
-    def __init__(self, parent, global_settings, *args, **kwargs):
+    def __init__(self, parent: "MyMainWindow", global_settings: QtCore.QSettings, *args, **kwargs):
         super().__init__(*args, **kwargs)
         QtWidgets.QVBoxLayout(self)
-        self.settings_widget: EquipmentSettings = parent.settings_widget
+        self.settings_widget = parent.settings_widget
         self.global_settings = global_settings
-        self.widgets = []
+        self.widgets: List[SensorPositionWidget] = []
         self.css_boxes: Optional[CssCheckBoxes] = None
         self.multirange_state = False
         self.settings_widget.redraw_signal.connect(self.init_ui)
@@ -317,10 +348,10 @@ class MeasurementWidget(QtWidgets.QWidget):
         self.init_ui()
 
     def init_ui(self):
-        self.widgets = []
+        self.widgets: List[SensorPositionWidget] = []
         self.css_boxes = None
         clear_layout(self.layout())
-        comport, sensor_number, multirange, machine_name, machine_id = self.settings_widget.get_variables(
+        _, sensor_number, multirange, machine_name, _ = self.settings_widget.get_variables(
         )
         self.r4_str_values, r4_to_float, r4_to_int = self.settings_widget.get_r4_data()
         self.multirange_state = multirange
@@ -364,7 +395,8 @@ class MeasurementWidget(QtWidgets.QWidget):
         # self.layout().addStretch()
         for i in range(sensor_number):
             sensor_position_widget = SensorPositionWidget(
-                self, i, machine_name, self.r4_str_values, r4_to_float, r4_to_int)
+                self, i, machine_name, self.r4_str_values, r4_to_float, r4_to_int,
+                self.multirange_state)
             sensor_position_grid_layout.addWidget(sensor_position_widget,
                                                   i // 4, i % 4)
             sensor_position_grid_layout.setColumnStretch(i % 4, 1)
@@ -430,6 +462,9 @@ class MeasurementWidget(QtWidgets.QWidget):
         return [widget.working_sensor.isChecked() for widget in self.widgets]
 
     def send_us(self):
+        if len(self.widgets) == 0:
+            raise Exception("No widgets!")
+
         values = []
         for widget in self.widgets:
             try:
@@ -448,6 +483,12 @@ class MeasurementWidget(QtWidgets.QWidget):
             mess_box.setText("Port doesn't exist")
             mess_box.exec_()
         else:
+            if ms is None:
+                mess_box = QtWidgets.QMessageBox()
+                mess_box.setText("Can't create MS device")
+                mess_box.exec_()
+                return
+
             ms.send_measurement_range(current_states)
             sensor_types_list = self.get_sensor_types_list()
             us, rs = ms.full_request(values, request_type=MS_ABC.REQUEST_U,
@@ -458,17 +499,20 @@ class MeasurementWidget(QtWidgets.QWidget):
                 sr = funcs[mode](u)
                 widget.set_labels(u, r, sr, mode, 0)
 
-    def get_r4_resistance_modes(self):
-        current_states = []
-        for widget in self.widgets:
-            try:
-                index = self.r4_str_values.index(widget.r4_positions.currentText()) + 1
-            except:
-                current_states.append(3)
-            else:
-                current_states.append(index)
-        logger.debug(str(current_states))
-        return current_states
+    def get_r4_resistance_modes(self) -> List[int]:
+        if self.widgets:
+            current_states = []
+            for widget in self.widgets:
+                try:
+                    index = self.r4_str_values.index(widget.r4_positions.currentText()) + 1
+                except:
+                    current_states.append(3)
+                else:
+                    current_states.append(index)
+            logger.debug(str(current_states))
+            return current_states
+        else:
+            raise Exception("No widgets!")
 
     def set_all_working(self):
         for widget in self.widgets:

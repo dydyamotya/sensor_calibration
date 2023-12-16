@@ -1,5 +1,6 @@
 import struct
 import typing
+from typing import List
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -280,7 +281,7 @@ class MS_Uni():
         else:
             raise Exception("Wrong port number")
 
-    def send_measurement_range(self, values):
+    def send_measurement_range(self, values: List[int]):
         self.ms.send_measurement_range(values[:self.sensors_number])
         self.ms.recieve_measurement_range_answer()
 
