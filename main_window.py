@@ -5,6 +5,7 @@ from gas_state_widget import GasStateWidget
 from u_calibration import ImportCalibrationWidget
 from plotter import ExperimentPlotter
 from converter import ConverterWidget
+from experiment_editor import ExperimentEditorWidget
 
 import logging 
 
@@ -22,3 +23,4 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.paths_widget = PathsWidget(settings)
         self.plotter_experiment_widget = ExperimentPlotter()
         self.converter_widget = ConverterWidget(settings)
+        self.experiment_editor_widget = ExperimentEditorWidget(settings, self)

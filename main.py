@@ -60,23 +60,29 @@ def main():
     action.triggered.connect(main_window.converter_widget.toggle_visibility)
     converter_menu.addAction(action)
 
-    central_widget = QtWidgets.QTabWidget()
-    main_window.setCentralWidget(central_widget)
+    experiment_editor_menu = menu_bar.addMenu("Experiment")
+
+    action = QtWidgets.QAction("Editor", main_window)
+    action.triggered.connect(main_window.experiment_editor_widget.toggle_visibility)
+    experiment_editor_menu.addAction(action)
+
+    central_tab_widget = QtWidgets.QTabWidget()
+    main_window.setCentralWidget(central_tab_widget)
 
     measurement_widget = MeasurementWidget(main_window, settings)
-    central_widget.addTab(measurement_widget, "Measurement")
+    central_tab_widget.addTab(measurement_widget, "Measurement")
 
     window = OperationWidget(main_window, settings, measurement_widget)
-    central_widget.addTab(window, "Operation")
+    central_tab_widget.addTab(window, "Operation")
 
     window = CalibrationWidget(main_window, level, settings)
-    central_widget.addTab(window, "Heater calibration")
+    central_tab_widget.addTab(window, "Heater calibration")
 
     window = UCalibrationWidget(main_window, level, settings)
-    central_widget.addTab(window, "Sensor calibration")
+    central_tab_widget.addTab(window, "Sensor calibration")
 
     window = ChooseBestCombinationOfSensorsWidget(main_window, level, settings)
-    central_widget.addTab(window, "Choose best sensors")
+    central_tab_widget.addTab(window, "Choose best sensors")
 
     main_window.show()
 
