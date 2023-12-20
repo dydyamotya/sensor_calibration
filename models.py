@@ -24,7 +24,7 @@ class Machine(BaseModel):
 
 class SensorPosition(BaseModel):
     sensor_num = IntegerField()
-    r4 = FloatField()
+    r4 = TextField()
     rs_u1 = FloatField()
     rs_u2 = FloatField()
     k = FloatField()

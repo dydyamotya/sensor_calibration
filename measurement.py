@@ -36,7 +36,7 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
                  r4_str_values,
                  r4_to_float,
                  r4_to_int,
-                 multirange: str):
+                 multirange: int):
         super(SensorPositionWidget, self).__init__(parent)
         self.sensor_positions: Optional[List[Optional[SensorPosition]]] = None
         self.sensor_num = sensor_num
@@ -139,8 +139,9 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
             else:
                 if len(self.sensor_positions) > 1:
                     logger.warning("More than one sensor position for onerange machine")
+
                 sensor_position = self.sensor_positions[0]
-                self.r4_label = QtWidgets.QLabel(str(sensor_position.r4))
+                self.r4_label = QtWidgets.QLabel(sensor_position.r4)
                 layout.addWidget(self.r4_label)
                 buttons_layout = QtWidgets.QHBoxLayout()
                 layout.addLayout(buttons_layout, stretch=0)
@@ -189,7 +190,11 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
         resistances = resistances[:non_rep_index]
         temperatures = temperatures[:non_rep_index]
 
-        non_neg_diff_index = find_first_negative(np.diff(temperatures)) + 1
+        non_neg_diff_index = find_first_negative(np.diff(temperatures))
+        if non_neg_diff_index is None:
+            non_neg_diff_index = 0
+        else:
+            non_neg_diff_index += 1
 
         self.voltages = voltages[non_neg_diff_index:]
         self.resistances = resistances[non_neg_diff_index:]
@@ -253,41 +258,70 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
         return self.func_T_to_U
 
     def get_voltage_to_resistance_funcs(self):
-        funcs_dict = {}
-        if (self.resistances_convertors_loaded and self.working_sensor.isChecked()):
-            r4s = tuple(sensor_position.r4 for sensor_position in self.sensor_positions)
-            for r4_str in self.r4_str_values:
-                if r4_str in r4s:
-                    sensor_position, *_ = [
-                        sensor_position for sensor_position in self.sensor_positions
-                        if sensor_position.r4 == r4_str
-                    ]
-                    rs_u1 = float(sensor_position.rs_u1)
-                    rs_u2 = float(sensor_position.rs_u2)
-                    r4 = self.r4_to_float[sensor_position.r4]
+        if self.multirange:
+            funcs_dict = {}
+            if (self.resistances_convertors_loaded and self.working_sensor.isChecked()):
+                r4s = tuple(sensor_position.r4 for sensor_position in self.sensor_positions)
+                for r4_str in self.r4_str_values:
+                    if r4_str in r4s:
+                        sensor_position, *_ = [
+                            sensor_position for sensor_position in self.sensor_positions
+                            if sensor_position.r4 == r4_str
+                        ]
+                        rs_u1 = float(sensor_position.rs_u1)
+                        rs_u2 = float(sensor_position.rs_u2)
+                        r4 = self.r4_to_float[sensor_position.r4]
 
-                    vertical_asimptote = 2.5 + 4.068 * (2.5 - rs_u2)
+                        vertical_asimptote = 2.5 + 4.068 * (2.5 - rs_u2)
 
-                    def function_wrapper(rs_u1, rs_u2, r4):
-                        def f(u):
-                            logger.debug(f"rs1: {rs_u1}, rs2: {rs_u2}, r4: {r4}, u: {u}")
-                            if u < vertical_asimptote:
-                                return (rs_u1 - rs_u2) * r4 / ((2.5 + 2.5 * 4.068 - u) / 4.068 - rs_u2) - r4
-                            else:
-                                return 1e14
+                        def function_wrapper(rs_u1, rs_u2, r4):
+                            def f(u):
+                                logger.debug(f"rs1: {rs_u1}, rs2: {rs_u2}, r4: {r4}, u: {u}")
+                                if u < vertical_asimptote:
+                                    return (rs_u1 - rs_u2) * r4 / ((2.5 + 2.5 * 4.068 - u) / 4.068 - rs_u2) - r4
+                                else:
+                                    return 1e14
 
-                        return f
+                            return f
 
-                    logger.debug(f"R4 is calibrated {r4_str} {r4s} {rs_u1} {rs_u2}")
-                    funcs_dict[self.r4_to_int[sensor_position.r4]] = function_wrapper(rs_u1, rs_u2, r4)
-                else:
-                    logger.debug(f"R4 not in set of calibrated {r4_str} {r4s}")
+                        logger.debug(f"R4 is calibrated {r4_str} {r4s} {rs_u1} {rs_u2}")
+                        funcs_dict[self.r4_to_int[sensor_position.r4]] = function_wrapper(rs_u1, rs_u2, r4)
+                    else:
+                        logger.debug(f"R4 not in set of calibrated {r4_str} {r4s}")
+                        funcs_dict[self.r4_to_int[r4_str]] = lambda u: u
+            else:
+                logger.debug("Not calibrated")
+                for r4_str in self.r4_str_values:
                     funcs_dict[self.r4_to_int[r4_str]] = lambda u: u
+            return funcs_dict
         else:
-            logger.debug("Not calibrated")
-            for r4_str in self.r4_str_values:
-                funcs_dict[self.r4_to_int[r4_str]] = lambda u: u
-        return funcs_dict
+            if (self.resistances_convertors_loaded and self.working_sensor.isChecked()):
+                sensor_position = self.sensor_positions[0]
+                try:
+                    r4 = float(sensor_position.r4)
+                except ValueError:
+                    logger.warn("R4 is not calibrated")
+                    return lambda u: u
+                rs_u1 = float(sensor_position.rs_u1)
+                rs_u2 = float(sensor_position.rs_u2)
+
+                vertical_asimptote = 2.5 + 4.068 * (2.5 - rs_u2)
+
+                def function_wrapper(rs_u1, rs_u2, r4):
+                    def f(u):
+                        logger.debug(f"rs1: {rs_u1}, rs2: {rs_u2}, r4: {r4}, u: {u}")
+                        if u < vertical_asimptote:
+                            return (rs_u1 - rs_u2) * r4 / ((2.5 + 2.5 * 4.068 - u) / 4.068 - rs_u2) - r4
+                        else:
+                            return 1e14
+
+                    return f
+
+                return function_wrapper(rs_u1, rs_u2, r4)
+            else:
+                logger.debug("Not calibrated")
+                return lambda u: u
+
 
     def set_labels(self, u, r, sr, mode, temperature, un=0):
         if u == sr:
@@ -341,7 +375,7 @@ class MeasurementWidget(QtWidgets.QWidget):
         self.global_settings = global_settings
         self.widgets: List[SensorPositionWidget] = []
         self.css_boxes: Optional[CssCheckBoxes] = None
-        self.multirange_state = False
+        self.multirange_state = 0
         self.settings_widget.redraw_signal.connect(self.init_ui)
         self.settings_widget.calibration_redraw_signal.connect(self.init_ui)
         self.settings_widget.start_program_signal.connect(self.process_program_signal)
@@ -452,6 +486,11 @@ class MeasurementWidget(QtWidgets.QWidget):
     def get_voltage_to_resistance_funcs(self):
         return tuple(widget.get_voltage_to_resistance_funcs() for widget in self.widgets)
 
+
+    def get_multirange_status(self) -> int:
+        return self.multirange_state
+
+
     def set_results_values_to_widgets(self, us, rs, srs, modes, temperatures, uns=None):
         if uns is None:
             uns = (0,) * 12
@@ -474,34 +513,58 @@ class MeasurementWidget(QtWidgets.QWidget):
             else:
                 values.append(value)
 
-        current_states = self.get_r4_resistance_modes()
-        logger.debug(f"{values}, {current_states}")
-        try:
-            ms = self.settings_widget.get_new_ms()
-        except:
-            mess_box = QtWidgets.QMessageBox()
-            mess_box.setText("Port doesn't exist")
-            mess_box.exec_()
-        else:
-            if ms is None:
+        if self.multirange_state:
+            current_states = self.get_r4_resistance_modes()
+            logger.debug(f"{values}, {current_states}")
+            try:
+                ms = self.settings_widget.get_new_ms()
+            except:
                 mess_box = QtWidgets.QMessageBox()
-                mess_box.setText("Can't create MS device")
+                mess_box.setText("Port doesn't exist")
                 mess_box.exec_()
-                return
+            else:
+                if ms is None:
+                    mess_box = QtWidgets.QMessageBox()
+                    mess_box.setText("Can't create MS device")
+                    mess_box.exec_()
+                    return
+                ms.send_measurement_range(current_states)
+                sensor_types_list = self.get_sensor_types_list()
+                us, rs = ms.full_request(values, request_type=MS_ABC.REQUEST_U,
+                                         sensor_types_list=sensor_types_list)
+                for widget, u, r, mode in zip(self.widgets, us, rs, current_states):
+                    funcs = widget.get_voltage_to_resistance_funcs()
+                    logger.debug(str(funcs))
+                    sr = funcs[mode](u)
+                    widget.set_labels(u, r, sr, mode, 0)
+        else:
+            try:
+                ms = self.settings_widget.get_new_ms()
+            except:
+                mess_box = QtWidgets.QMessageBox()
+                mess_box.setText("Port doesn't exist")
+                mess_box.exec_()
+            else:
+                if ms is None:
+                    mess_box = QtWidgets.QMessageBox()
+                    mess_box.setText("Can't create MS device")
+                    mess_box.exec_()
+                    return
+                sensor_types_list = self.get_sensor_types_list()
+                us, rs = ms.full_request(values, request_type=MS_ABC.REQUEST_U,
+                                         sensor_types_list=sensor_types_list)
+                for widget, u, r in zip(self.widgets, us, rs):
+                    func = widget.get_voltage_to_resistance_funcs()
+                    logger.debug(str(func))
+                    sr = func(u)
+                    widget.set_labels(u, r, sr, 0, 0)
 
-            ms.send_measurement_range(current_states)
-            sensor_types_list = self.get_sensor_types_list()
-            us, rs = ms.full_request(values, request_type=MS_ABC.REQUEST_U,
-                                     sensor_types_list=sensor_types_list)
-            for widget, u, r, mode in zip(self.widgets, us, rs, current_states):
-                funcs = widget.get_voltage_to_resistance_funcs()
-                logger.debug(str(funcs))
-                sr = funcs[mode](u)
-                widget.set_labels(u, r, sr, mode, 0)
 
     def get_r4_resistance_modes(self) -> List[int]:
         if self.widgets:
             current_states = []
+            if not self.multirange_state:
+                return current_states
             for widget in self.widgets:
                 try:
                     index = self.r4_str_values.index(widget.r4_positions.currentText()) + 1

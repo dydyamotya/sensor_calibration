@@ -41,7 +41,7 @@ class SimpleStage(Stage):
                 "Not enough information for initialization of simple stage")
 
     def to_dict(self, for_ui=False) -> dict:
-        if for_ui:
+        if not for_ui:
             result_dict = {"type": self.name}
         else:
             result_dict = {}
@@ -87,7 +87,7 @@ class StepwiseStage(Stage):
                 "Not enough information for initialization of simple stage")
 
     def to_dict(self, for_ui=False) -> dict:
-        if for_ui:
+        if not for_ui:
             result_dict = {"type": self.name}
         else:
             result_dict = {}
@@ -107,6 +107,49 @@ class StepwiseStage(Stage):
     def default(cls) -> "StepwiseStage":
         return cls(0.0, 0.0, 0.0, 0.0, 0, [0, 1])
 
+class CyclicStage(Stage):
 
-list_of_types = [SimpleStage, StepwiseStage]
+    name = "cyclic"
+
+    def __init__(self,
+                 repeat: int,
+                 temperatures: dict,
+                 gas_states: List[dict]):
+        self.repeat = repeat
+        self.temperatures = temperatures
+        self.gas_states = gas_states
+
+    @classmethod
+    def from_dict(cls, dict_: dict) -> "CyclicStage":
+        try:
+            return cls(dict_["repeat"],
+                       dict_["temperatures"],
+                       dict_["gas_states"],
+                       )
+        except KeyError:
+            raise Exception(
+                "Not enough information for initialization of simple stage")
+
+    def to_dict(self, for_ui=False) -> dict:
+        if not for_ui:
+            result_dict = {"type": self.name}
+        else:
+            result_dict = {}
+
+        result_dict.update({
+            "repeat": self.repeat,
+            "temperatures": self.temperatures,
+            "gas_states": self.gas_states,
+        })
+
+        return result_dict
+
+    @classmethod
+    def default(cls) -> "CyclicStage":
+        return cls(40,
+                   {"time": [0, 9, 10, 19, 20, 29, 30, 39, 40, 49],
+                    "temperature": [300, 300, 200, 200, 300, 300, 100, 100, 200, 200]}, [{"state": 0, "number": 10}, {"state": 1, "number": 10} ])
+
+
+list_of_types = [SimpleStage, StepwiseStage, CyclicStage]
 dict_of_stage_types = {type_.name.lower(): type_ for type_ in list_of_types}

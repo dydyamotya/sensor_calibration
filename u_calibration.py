@@ -149,7 +149,7 @@ class OneSensorFrame(QtWidgets.QWidget):
                                                1] for answer in answers[5:]
                                     ]) / 10))
                         except IndexError:
-                            print("No sensor there")
+                            logger.error("No sensor there")
                     except:
                         ms.close()
 
@@ -309,7 +309,7 @@ class PlotWidget(QtWidgets.QWidget):
             self.close()
 
     def on_accept(self):
-        comport, sensor_number, multirange, machine_name, machine_id = self.settings_widget.get_variables(
+        *_, machine_id = self.settings_widget.get_variables(
         )
         SensorPosition.create(machine=machine_id,
                               sensor_num=self.sensor_num,
@@ -441,7 +441,7 @@ class ImportCalibrationWidget(QtWidgets.QWidget):
         config.optionxform = deduplicate
         config.read(filename)
 
-        comport, sensor_number, multirange, machine_name, machine_id = self.settings_widget.get_variables(
+        _, sensor_number, _, _, machine_id = self.settings_widget.get_variables(
         )
         not_added = []
         for sens_num in range(sensor_number):

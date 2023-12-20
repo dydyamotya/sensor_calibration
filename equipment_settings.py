@@ -24,6 +24,7 @@ class EquipmentSettings(QtWidgets.QWidget):
         self.machine_name_widget = DatabaseLeaderComboboxWidget(Machine, "name")
 
         layout.addRow("Machine name:", self.machine_name_widget)
+        layout.addWidget(QtWidgets.QLabel('Hit "Enter" in "Machine name" field to change machine'))
 
         self.comport_widget = DatabaseNonleaderComboboxWidget(self.machine_name_widget,
                                                               "last_port",
@@ -55,13 +56,13 @@ class EquipmentSettings(QtWidgets.QWidget):
         self.machine_name_widget.enter_hit_signal.connect(self.multirange_widget.on_leader_value_change)
         self.machine_name_widget.enter_hit_signal.connect(self.modes_widget.on_leader_value_change)
 
-        self.machine_name_widget.activated.connect(self.redraw_signal.emit)
+        self.machine_name_widget.enter_hit_signal.connect(self.redraw_signal.emit)
         self.multirange_widget.activated.connect(self.redraw_signal.emit)
         self.sensor_number_widget.activated.connect(self.redraw_signal.emit)
         self.comport_widget.activated.connect(self.redraw_signal.emit)
         self.modes_widget.someValueChanged.connect(self.redraw_signal.emit)
 
-        self.machine_name_widget.activated.connect(self.calibration_redraw_signal.emit)
+        self.machine_name_widget.enter_hit_signal.connect(self.calibration_redraw_signal.emit)
         self.multirange_widget.activated.connect(self.calibration_redraw_signal.emit)
         self.sensor_number_widget.activated.connect(self.calibration_redraw_signal.emit)
         self.comport_widget.activated.connect(self.calibration_redraw_signal.emit)
