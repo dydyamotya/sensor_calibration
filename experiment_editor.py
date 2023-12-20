@@ -332,12 +332,19 @@ class ListOfStages(QtWidgets.QListWidget):
     def redraw_plot(self):
         experiment_dict = self.create_dict()
         program_generator = ProgramGenerator(experiment_dict)
+        full_time = program_generator.calculate_full_time()
         program_generator_gen = program_generator.parse_program_to_queue()
         times = []
         temperatures = []
+        progress = QtWidgets.QProgressDialog("Generating plot", "Stop",
+                                             0, full_time, self)
+        progress.setWindowModality(QtCore.Qt.WindowModal)
         for time_next, (temperatures_, _, _, _) in program_generator_gen:
             times.append(time_next)
             temperatures.append(temperatures_[0])
+            progress.setValue(time_next)
+            if progress.wasCanceled():
+                break
         times = np.array(times)
         temperatures = np.array(temperatures)
         self.redraw_plot_signal.emit(times, temperatures)

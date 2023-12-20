@@ -15,14 +15,19 @@ class ProgramGenerator:
 
     def __init__(self, program):
         self.program = munch.munchify(program)
+        settings = self.program.settings
+        settings.step = 1 / settings.frequency
 
     def parse_program_to_queue(self):
         self.reset_stage_number()
         settings = self.program.settings
         program = self.program.program
-        settings.step = 1 / settings.frequency
         full = zip(itertools.count(0, settings.step), ProgramGenerator._parse_all_program(program, settings))
         return full
+
+    def calculate_full_time(self):
+        self.reset_stage_number()
+        return ProgramGenerator._calculate_full_time(self.program.program, self.program.settings)
 
     @classmethod
     def get_stage_number(cls):
@@ -92,6 +97,21 @@ class ProgramGenerator:
                 raise ProgramGeneratorException
 
     @staticmethod
+    def _calculate_full_time(program, settings):
+        full_time = 0
+        for stage in program:
+            if stage.type == "simple":
+                full_time += ProgramGenerator._calculate_simple_time(stage)
+            elif stage.type == "stepwise":
+                full_time += ProgramGenerator._calculate_stepwise_time(stage)
+            elif stage.type == "cyclic":
+                full_time += ProgramGenerator._calculate_cyclic_time(stage)
+            else:
+                raise ProgramGeneratorException
+        return full_time
+
+
+    @staticmethod
     def _process_simple(stage, settings):
         stage_num = ProgramGenerator.get_stage_number()
         step = settings.step
@@ -123,4 +143,18 @@ class ProgramGenerator:
             stage_num = ProgramGenerator.get_stage_number()
             for inter_time in np.arange(0, max_time, step):
                 yield ProgramGenerator.convert_temperatures(float(func(inter_time))), gas_get_func(inter_time), stage_num, 2
+
+    @staticmethod
+    def _calculate_simple_time(stage):
+        return stage.time
+
+    @staticmethod
+    def _calculate_stepwise_time(stage):
+        return np.arange(stage.temperature_start, stage.temperature_stop, stage.temperature_step).shape[0] * stage.cycles * len(stage.gas_states)
+
+    @staticmethod
+    def _calculate_cyclic_time(stage):
+        return stage.repeat * max(stage.temperatures.time)
+        
+
 

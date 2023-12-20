@@ -56,7 +56,7 @@ class SimpleStage(Stage):
 
     @classmethod
     def default(cls) -> "SimpleStage":
-        return cls(0.0, 0.0, 0)
+        return cls(300.0, 500.0, 1)
 
 
 class StepwiseStage(Stage):
@@ -105,7 +105,7 @@ class StepwiseStage(Stage):
 
     @classmethod
     def default(cls) -> "StepwiseStage":
-        return cls(0.0, 0.0, 0.0, 0.0, 0, [0, 1])
+        return cls(900.0, 500.0, 270.0, 30.0, 3, [2, 3])
 
 class CyclicStage(Stage):
 
