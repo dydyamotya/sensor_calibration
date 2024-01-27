@@ -23,7 +23,8 @@ def main():
     args = parser.parse_args()
     level = logging.DEBUG if args.debug else logging.INFO
     logging.basicConfig(
-        level=level, format='%(asctime)s:%(module)s:%(levelname)s:%(message)s')
+        level=level, format="%(asctime)s:%(module)s:%(levelname)s:%(message)s"
+    )
 
     main_window = MyMainWindow(settings)
     main_window.setWindowTitle("SensorinGas Beta")
@@ -48,11 +49,14 @@ def main():
     action.triggered.connect(main_window.paths_widget.toggle_visibility)
     settings_menu.addAction(action)
 
+    action = QtWidgets.QAction("Drop empty r4 records in database")
+    action.triggered.connect(main_window.settings_widget.drop_empty_records_for_machine)
+    settings_menu.addAction(action)
+
     plotter_menu = menu_bar.addMenu("Plotter")
 
     action = QtWidgets.QAction("Experiment plotter", main_window)
-    action.triggered.connect(
-        main_window.plotter_experiment_widget.toggle_visibility)
+    action.triggered.connect(main_window.plotter_experiment_widget.toggle_visibility)
     plotter_menu.addAction(action)
 
     converter_menu = menu_bar.addMenu("Converter")
@@ -64,8 +68,7 @@ def main():
     experiment_editor_menu = menu_bar.addMenu("Experiment")
 
     action = QtWidgets.QAction("Editor", main_window)
-    action.triggered.connect(
-        main_window.experiment_editor_widget.toggle_visibility)
+    action.triggered.connect(main_window.experiment_editor_widget.toggle_visibility)
     experiment_editor_menu.addAction(action)
 
     central_tab_widget = QtWidgets.QTabWidget()
