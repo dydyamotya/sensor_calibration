@@ -27,8 +27,18 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 colors_for_lines = [
-    '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b',
-    '#e377c2', '#7f7f7f', '#bcbd22', '#17becf', "#DDDDDD", "#00FF00"
+    "#1f77b4",
+    "#ff7f0e",
+    "#2ca02c",
+    "#d62728",
+    "#9467bd",
+    "#8c564b",
+    "#e377c2",
+    "#7f7f7f",
+    "#bcbd22",
+    "#17becf",
+    "#DDDDDD",
+    "#00FF00",
 ]
 
 
@@ -37,7 +47,6 @@ def format_floats(floats_list):
 
 
 class LinesDrawButton(QtWidgets.QPushButton):
-
     def __init__(self, plot_widget, *args, **kwargs):
         super(LinesDrawButton, self).__init__("Lines toggle", *args, **kwargs)
         self.plot_widget = plot_widget
@@ -56,8 +65,7 @@ class LinesDrawButton(QtWidgets.QPushButton):
             pixmap_label = ClickableLabel(idx, self)
             pixmap_label.setPixmap(pixmap)
             pixmap_label.setAlignment(Qt.AlignRight)
-            pixmap_label.clicked.connect(
-                self.plot_widget.set_visible_invisible)
+            pixmap_label.clicked.connect(self.plot_widget.set_visible_invisible)
             self.pixmaps.append(pixmap_label)
             label = QtWidgets.QLabel(f"Sensor {idx + 1}")
             self.labels.append(label)
@@ -82,10 +90,14 @@ class LinesDrawButton(QtWidgets.QPushButton):
             pixmap.set_true()
 
 
-class QueueRunner():
-
-    def __init__(self, queue: Queue, converters_func_voltage_to_r,
-                 multirange_state_func, save_folder):
+class QueueRunner:
+    def __init__(
+        self,
+        queue: Queue,
+        converters_func_voltage_to_r,
+        multirange_state_func,
+        save_folder,
+    ):
         self.queue = queue
         self.thread = None
         self.hold_method = None
@@ -115,12 +127,13 @@ class QueueRunner():
         if self.hold_method is not None and self.stopped:
             self.stopped = False
             self.thread = threading.Thread(target=self.cycle)
-            self.filename = (pathlib.Path(self.save_folder) /
-                             datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-                             ).with_suffix(".txt")
+            self.filename = (
+                pathlib.Path(self.save_folder)
+                / datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+            ).with_suffix(".txt")
             self.binary_filename = (
-                pathlib.Path(self.save_folder) /
-                datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+                pathlib.Path(self.save_folder)
+                / datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
             ).with_suffix(".dat")
             self.thread.start()
 
@@ -139,56 +152,102 @@ class QueueRunner():
             sleep(0.02)
             if not self.queue.empty():
                 data = self.queue.get()
-                us, rs, time_next_plus_t0, time_next, temperatures, gas_state, stage_num, stage_type, sensor_states, converted = data
+                (
+                    us,
+                    rs,
+                    time_next_plus_t0,
+                    time_next,
+                    temperatures,
+                    gas_state,
+                    stage_num,
+                    stage_type,
+                    sensor_states,
+                    converted,
+                ) = data
                 if multirange:
                     sensor_resistances = tuple(
                         converter_func_dict[sensor_state](u)
                         for converter_func_dict, u, sensor_state in zip(
-                            converter_funcs, us, sensor_states))
+                            converter_funcs, us, sensor_states
+                        )
+                    )
                 else:
                     sensor_resistances = tuple(
                         converter_func_dict(u)
                         for converter_func_dict, u, sensor_state in zip(
-                            converter_funcs, us, sensor_states))
+                            converter_funcs, us, sensor_states
+                        )
+                    )
                 logger.debug(f"Call in cycle")
-                self.set_meas_tuple((us, rs, sensor_resistances, sensor_states,
-                                     temperatures, converted))
+                self.set_meas_tuple(
+                    (us, rs, sensor_resistances, sensor_states, temperatures, converted)
+                )
                 self.hold_method((sensor_resistances, rs, time_next))
                 if not headed:
                     sensors_number = len(rs)
                     headed = True
-                    bin_write_struct = struct.Struct("<f" +
-                                                     sensors_number * 4 * "f" +
-                                                     "BIH" +
-                                                     sensors_number * "B")
+                    bin_write_struct = struct.Struct(
+                        "<f" + sensors_number * 4 * "f" + "BIH" + sensors_number * "B"
+                    )
                     fd_bin.write(struct.pack("<B", sensors_number))
                 fd_bin.write(
-                    bin_write_struct.pack(time_next, *us, *rs,
-                                          *sensor_resistances, *temperatures,
-                                          gas_state, stage_num, stage_type,
-                                          *sensor_states))
+                    bin_write_struct.pack(
+                        time_next,
+                        *us,
+                        *rs,
+                        *sensor_resistances,
+                        *temperatures,
+                        gas_state,
+                        stage_num,
+                        stage_type,
+                        *sensor_states,
+                    )
+                )
         while not self.queue.empty():
             data = self.queue.get()
-            us, rs, time_next_plus_t0, time_next, temperatures, gas_state, stage_num, stage_type, sensor_states, converted = data
+            (
+                us,
+                rs,
+                time_next_plus_t0,
+                time_next,
+                temperatures,
+                gas_state,
+                stage_num,
+                stage_type,
+                sensor_states,
+                converted,
+            ) = data
             sensor_resistances = tuple(
                 converter_func_dict[sensor_state](u)
                 for converter_func_dict, u, sensor_state in zip(
-                    converter_funcs, us, sensor_states))
+                    converter_funcs, us, sensor_states
+                )
+            )
             logger.debug(f"Call in cycle")
-            self.set_meas_tuple((us, rs, sensor_resistances, sensor_states,
-                                 temperatures, converted))
+            self.set_meas_tuple(
+                (us, rs, sensor_resistances, sensor_states, temperatures, converted)
+            )
             self.hold_method((sensor_resistances, rs, time_next))
             if not headed:
                 sensors_number = len(rs)
                 headed = True
-                bin_write_struct = struct.Struct("<f" +
-                                                 sensors_number * 4 * "f" +
-                                                 "BIH" + sensors_number * "B")
+                bin_write_struct = struct.Struct(
+                    "<f" + sensors_number * 4 * "f" + "BIH" + sensors_number * "B"
+                )
                 fd_bin.write(struct.pack("<B", sensors_number))
             fd_bin.write(
-                bin_write_struct.pack(time_next, *us, *rs, *sensor_resistances,
-                                      *temperatures, gas_state, stage_num,
-                                      stage_type, *sensor_states))
+                bin_write_struct.pack(
+                    time_next,
+                    *us,
+                    *rs,
+                    *sensor_resistances,
+                    *temperatures,
+                    gas_state,
+                    stage_num,
+                    stage_type,
+                    *sensor_states,
+                )
+            )
 
         fd_bin.close()
 
@@ -200,9 +259,14 @@ class OperationWidget(QtWidgets.QWidget):
     stop_signal = Signal()
     running_signal = Signal()
 
-    def __init__(self, parent: "MyMainWindow",
-                 global_settings: QtCore.QSettings,
-                 measurement_widget: "MeasurementWidget", *args, **kwargs):
+    def __init__(
+        self,
+        parent: "MyMainWindow",
+        global_settings: QtCore.QSettings,
+        measurement_widget: "MeasurementWidget",
+        *args,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self.parent_py = parent
         self.global_settings = global_settings
@@ -211,12 +275,15 @@ class OperationWidget(QtWidgets.QWidget):
         self.runner = None
         self.generator = None
         self.queue = Queue()
-        save_folder = self.global_settings.value("operation_widget_save_path",
-                                                 "./tests")
+        save_folder = self.global_settings.value(
+            "operation_widget_save_path", "./tests"
+        )
         self.queue_runner = QueueRunner(
             self.queue,
             self.measurement_widget.get_voltage_to_resistance_funcs,
-            self.measurement_widget.get_multirange_status, save_folder)
+            self.measurement_widget.get_multirange_status,
+            save_folder,
+        )
         self.settings: EquipmentSettings = self.parent_py.settings_widget
         self.settings.redraw_signal.connect(self.refresh_state)
         layout = QtWidgets.QVBoxLayout(self)
@@ -232,8 +299,7 @@ class OperationWidget(QtWidgets.QWidget):
 
         load_program_groupbox = QtWidgets.QGroupBox()
         load_program_groupbox.setTitle("Program")
-        load_program_groupbox_layout = QtWidgets.QHBoxLayout(
-            load_program_groupbox)
+        load_program_groupbox_layout = QtWidgets.QHBoxLayout(load_program_groupbox)
         self.load_program_button = QtWidgets.QPushButton("Load program")
         self.load_program_button.clicked.connect(self.load_program)
 
@@ -274,8 +340,7 @@ class OperationWidget(QtWidgets.QWidget):
 
         plot_options_groupbox = QtWidgets.QGroupBox()
         plot_options_groupbox.setTitle("Plot options")
-        plot_options_groupbox_layout = QtWidgets.QHBoxLayout(
-            plot_options_groupbox)
+        plot_options_groupbox_layout = QtWidgets.QHBoxLayout(plot_options_groupbox)
 
         temp_button = QtWidgets.QPushButton("Only working")
         temp_button.clicked.connect(self.turn_on_working_lines)
@@ -337,22 +402,28 @@ class OperationWidget(QtWidgets.QWidget):
         if self.load_label.text() == "Loaded":
             self.refresh_state()
             self.load_program_button.setEnabled(False)
-            comport, sensor_number, multirange, *_ = self.settings.get_variables(
-            )
+            comport, sensor_number, multirange, *_ = self.settings.get_variables()
             self.runner = ProgramRunner(
-                self.generator, self.settings.get_new_ms,
+                self.generator,
+                self.settings.get_new_ms,
                 self.measurement_widget.get_sensor_types_list,
                 self.measurement_widget.get_convert_funcs,
-                self.get_range_mode_settings(), multirange,
-                self.gasstate_widget.send_state, self.get_checkbox_state,
-                self.queue, self.stop_signal, self.running_signal,
-                sensor_number)
+                self.get_range_mode_settings(),
+                multirange,
+                self.gasstate_widget.send_state,
+                self.get_checkbox_state,
+                self.queue,
+                self.stop_signal,
+                self.running_signal,
+                sensor_number,
+            )
             self.plot_widget.clear_plot()
             self.runner.start()
             self.queue_runner.start()
             self.timer_plot.start()
             self.values_set_timer.setInterval(
-                int(self.generator.program.settings.step * 500))
+                int(self.generator.program.settings.step * 500)
+            )
             self.values_set_timer.start()
             self.settings.start_program_signal.emit(1)
 
@@ -370,16 +441,21 @@ class OperationWidget(QtWidgets.QWidget):
 
     def load_program(self):
         filename, filter = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Open program",
-            self.global_settings.value("operation_widget_programs_path",
-                                       "./tests"), "Program file (*.yaml)")
+            self,
+            "Open program",
+            self.global_settings.value("operation_widget_programs_path", "./tests"),
+            "Program file (*.yaml)",
+        )
         if not filename:
             self.load_label.setText("Not loaded")
             self.load_label.setStyleSheet("background-color:pink")
             return
-        self.global_settings.setValue(
-            "operation_widget_programs_path",
-            pathlib.Path(filename).parent.as_posix()),
+        (
+            self.global_settings.setValue(
+                "operation_widget_programs_path",
+                pathlib.Path(filename).parent.as_posix(),
+            ),
+        )
         try:
             loaded = yaml.load(pathlib.Path(filename).read_text(), yaml.Loader)
         except:
@@ -399,8 +475,8 @@ class OperationWidget(QtWidgets.QWidget):
     def turn_on_working_lines(self):
         if self.plot_widget:
             for state, pixmap in zip(
-                    self.measurement_widget.get_working_widgets(),
-                    self.lines_widget.pixmaps):
+                self.measurement_widget.get_working_widgets(), self.lines_widget.pixmaps
+            ):
                 if state != pixmap.state:
                     pixmap.click()
 
@@ -421,11 +497,21 @@ class OperationWidget(QtWidgets.QWidget):
 
 
 class ProgramRunner:
-
-    def __init__(self, program_generator: ProgramGenerator, get_ms_method,
-                 get_sensor_types_list, get_convert_funcs, solid_mode,
-                 multirange, send_gasstate_func, checkbox_state, queue,
-                 stop_signal, running_signal, sensor_number):
+    def __init__(
+        self,
+        program_generator: ProgramGenerator,
+        get_ms_method,
+        get_sensor_types_list,
+        get_convert_funcs,
+        solid_mode,
+        multirange,
+        send_gasstate_func,
+        checkbox_state,
+        queue,
+        stop_signal,
+        running_signal,
+        sensor_number,
+    ):
         self.stopped = True
         self.stop_signal = stop_signal
         self.running_signal = running_signal
@@ -471,17 +557,20 @@ class ProgramRunner:
         sensor_stab_down_states = [
             True,
         ] * self.sensor_number
+        sensors_critical_values_top = []
+        sensors_critical_values_bottom = []
 
         while not self.stopped:
             try:
-                time_next, (temperatures, gas_state, stage_num,
-                            stage_type) = next(self.program)
+                time_next, (temperatures, gas_state, stage_num, stage_type) = next(
+                    self.program
+                )
             except StopIteration:
                 self.stop_signal.emit()
                 self.stopped = True
             else:
                 self.running_signal.emit()
-                temperatures = temperatures[:self.sensor_number]
+                temperatures = temperatures[: self.sensor_number]
                 time_next_plus_t0 = time_0 + time_next
                 while time() < time_next_plus_t0:
                     sleep(time_sleep)
@@ -492,13 +581,15 @@ class ProgramRunner:
                         us, rs = ms.full_request(
                             converted,
                             request_type=MS_ABC.REQUEST_U,
-                            sensor_types_list=sensor_types_list)
+                            sensor_types_list=sensor_types_list,
+                        )
                     else:
                         converted = self.convert_to_resistances(temperatures)
                         us, rs = ms.full_request(
                             converted,
                             request_type=MS_ABC.REQUEST_R,
-                            sensor_types_list=sensor_types_list)
+                            sensor_types_list=sensor_types_list,
+                        )
                 except MS_ABC.MSException:
                     self.stop_signal.emit()
                     self.clear_ms_state(ms)
@@ -509,12 +600,27 @@ class ProgramRunner:
                     except:
                         logger.error("Cant send gas_state")
                     finally:
-                        self.queue.put((us, rs, time_next_plus_t0, time_next,
-                                        temperatures, gas_state, stage_num,
-                                        stage_type, sensor_states, converted))
-                        self.analyze_us(ms, us, sensor_states,
-                                        sensor_stab_up_states,
-                                        sensor_stab_down_states)
+                        self.queue.put(
+                            (
+                                us,
+                                rs,
+                                time_next_plus_t0,
+                                time_next,
+                                temperatures,
+                                gas_state,
+                                stage_num,
+                                stage_type,
+                                sensor_states,
+                                converted,
+                            )
+                        )
+                        self.analyze_us(
+                            ms,
+                            us,
+                            sensor_states,
+                            sensor_stab_up_states,
+                            sensor_stab_down_states,
+                        )
         self.clear_ms_state(ms)
 
     def clear_ms_state(self, ms: MS_Uni):
@@ -527,18 +633,24 @@ class ProgramRunner:
     def convert_to_voltages(self, temperatures):
         return [func(t) for t, func in zip(temperatures, self.convert_funcs_2)]
 
-    def analyze_us(self, ms: MS_Uni, us: np.ndarray, sensor_states: list,
-                   sensor_stab_up_states: list, sensor_stab_down_states: list):
+    def analyze_us(
+        self,
+        ms: MS_Uni,
+        us: np.ndarray,
+        sensor_states: list,
+        sensor_stab_up_states: list,
+        sensor_stab_down_states: list,
+    ):
         if self.need_to_analyze:
             i = 0
-            for idx, value_bool in enumerate(us > 4.6):
+            for idx, value_bool in enumerate(us > 4.0):
                 if value_bool and sensor_stab_up_states[idx]:
                     sensor_states[idx] = min(sensor_states[idx] + 1, 3)
                     if sensor_states[idx] == 3:
                         sensor_stab_up_states[idx] = False
                     sensor_stab_down_states[idx] = True
                     i += 1
-            for idx, value_bool in enumerate(us < 0.6):
+            for idx, value_bool in enumerate(us < 1):
                 if value_bool and sensor_stab_down_states[idx]:
                     sensor_states[idx] = max(sensor_states[idx] - 1, 1)
                     sensor_stab_up_states[idx] = True
@@ -551,15 +663,15 @@ class ProgramRunner:
             if self.multirange:
                 new_modes = self.solid_mode()
                 if not all(
-                        mode == prev_mode
-                        for mode, prev_mode in zip(new_modes, sensor_states)):
+                    mode == prev_mode
+                    for mode, prev_mode in zip(new_modes, sensor_states)
+                ):
                     ms.send_measurement_range(new_modes)
                     for i in range(len(sensor_states)):
                         sensor_states[i] = new_modes[i]
 
 
 class AnswerPlotWidget(pg.PlotWidget):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.sensor_number = 12
@@ -567,13 +679,15 @@ class AnswerPlotWidget(pg.PlotWidget):
 
         self.rs = np.empty(shape=(self.sensor_number, self.number_of_dots))
         self.us = np.empty(shape=(self.sensor_number, self.number_of_dots))
-        self.times = np.empty(shape=(self.number_of_dots, ))
+        self.times = np.empty(shape=(self.number_of_dots,))
         self.drawing_index = 0
         self.emphasized_lines = []
         self.hidden_lines = []
-        self.legend = pg.LegendItem(offset=(-10, 10),
-                                    labelTextColor=pg.mkColor("#FFFFFF"),
-                                    brush=pg.mkBrush(pg.mkColor("#111111")))
+        self.legend = pg.LegendItem(
+            offset=(-10, 10),
+            labelTextColor=pg.mkColor("#FFFFFF"),
+            brush=pg.mkBrush(pg.mkColor("#111111")),
+        )
         plot_item = self.getPlotItem()
         self.vboxitem = plot_item.getViewBox()
         self.legend.setParentItem(plot_item)
@@ -585,7 +699,8 @@ class AnswerPlotWidget(pg.PlotWidget):
             for i in range(self.sensor_number)
         ]
         for idx, (plot_data_item, color) in enumerate(
-                zip(self.plot_data_items, colors_for_lines)):
+            zip(self.plot_data_items, colors_for_lines)
+        ):
             plot_data_item.setPen(pg.mkPen(pg.mkColor(color), width=2))
             plot_data_item.setCurveClickable(True)
             plot_data_item.sigClicked.connect(self.line_clicked)
@@ -628,7 +743,7 @@ class AnswerPlotWidget(pg.PlotWidget):
         self.drawing_index = 0
         self.rs = np.empty(shape=(self.sensor_number, self.number_of_dots))
         self.us = np.empty(shape=(self.sensor_number, self.number_of_dots))
-        self.times = np.empty(shape=(self.number_of_dots, ))
+        self.times = np.empty(shape=(self.number_of_dots,))
         self.legend.clear()
         for idx, plot_item_data in enumerate(self.plot_data_items):
             plot_item_data.setData(x=[], y=[])
@@ -660,14 +775,13 @@ class AnswerPlotWidget(pg.PlotWidget):
             logger.debug(f"End adding dots {time_next}")
 
     def plot_answer(self):
-        logger.debug(
-            f'Try plotting data, drawing_index = {self.drawing_index}')
+        logger.debug(f"Try plotting data, drawing_index = {self.drawing_index}")
         with self.lock:
-            logger.debug(
-                f'Plotting data, drawing_index = {self.drawing_index}')
+            logger.debug(f"Plotting data, drawing_index = {self.drawing_index}")
             for plot_item, us_line, rs_line in zip(
-                    self.plot_data_items, self.us[:, :self.drawing_index],
-                    self.rs[:, :self.drawing_index]):
-                plot_item.setData(x=self.times[:self.drawing_index], y=us_line)
-            logger.debug(
-                f'End plotting data, drawing_index = {self.drawing_index}')
+                self.plot_data_items,
+                self.us[:, : self.drawing_index],
+                self.rs[:, : self.drawing_index],
+            ):
+                plot_item.setData(x=self.times[: self.drawing_index], y=us_line)
+            logger.debug(f"End plotting data, drawing_index = {self.drawing_index}")
