@@ -49,7 +49,7 @@ def main():
     action.triggered.connect(main_window.paths_widget.toggle_visibility)
     settings_menu.addAction(action)
 
-    action = QtWidgets.QAction("Drop empty r4 records in database")
+    action = QtWidgets.QAction("Drop empty r4 records in database", main_window)
     action.triggered.connect(main_window.settings_widget.drop_empty_records_for_machine)
     settings_menu.addAction(action)
 
