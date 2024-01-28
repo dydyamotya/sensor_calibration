@@ -450,11 +450,14 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
     def get_critical_voltages_for_mode(self, mode: int) -> Tuple[float, float]:
         if self.sensor_positions is not None:
             r4_str = self.r4_str_values[mode - 1]
-            sensor_position, *_ = [
-                sensor_position
-                for sensor_position in self.sensor_positions
-                if sensor_position is not None and (sensor_position.r4 == r4_str)
-            ]
+            try:
+                sensor_position, *_ = [
+                    sensor_position
+                    for sensor_position in self.sensor_positions
+                    if sensor_position is not None and (sensor_position.r4 == r4_str)
+                ]
+            except ValueError:
+                return 5.0, 0.0
 
             rs_u1_1 = float(sensor_position.rs_u1)
             rs_u2_1 = float(sensor_position.rs_u2)
