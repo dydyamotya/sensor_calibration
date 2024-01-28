@@ -403,6 +403,12 @@ class OperationWidget(QtWidgets.QWidget):
             self.refresh_state()
             self.load_program_button.setEnabled(False)
             comport, sensor_number, multirange, *_ = self.settings.get_variables()
+
+            (
+                critical_top,
+                critical_bottom,
+            ) = self.measurement_widget.get_critical_sensors_voltages()
+
             self.runner = ProgramRunner(
                 self.generator,
                 self.settings.get_new_ms,
@@ -416,6 +422,8 @@ class OperationWidget(QtWidgets.QWidget):
                 self.stop_signal,
                 self.running_signal,
                 sensor_number,
+                critical_top,
+                critical_bottom,
             )
             self.plot_widget.clear_plot()
             self.runner.start()
@@ -511,6 +519,8 @@ class ProgramRunner:
         stop_signal,
         running_signal,
         sensor_number,
+        sensors_critical_values_top,
+        sensors_critical_values_bottom,
     ):
         self.stopped = True
         self.stop_signal = stop_signal
@@ -528,6 +538,8 @@ class ProgramRunner:
         self.sensor_number = sensor_number
         self.thread = None
         self.queue = queue
+        self.sensors_critical_values_bottom = sensors_critical_values_bottom
+        self.sensors_critical_values_top = sensors_critical_values_top
 
         self.need_to_analyze = self.multirange and (self.solid_mode is None)
 
@@ -557,8 +569,8 @@ class ProgramRunner:
         sensor_stab_down_states = [
             True,
         ] * self.sensor_number
-        sensors_critical_values_top = []
-        sensors_critical_values_bottom = []
+        sensors_critical_values_top = self.sensors_critical_values_top
+        sensors_critical_values_bottom = self.sensors_critical_values_bottom
 
         while not self.stopped:
             try:
@@ -620,6 +632,8 @@ class ProgramRunner:
                             sensor_states,
                             sensor_stab_up_states,
                             sensor_stab_down_states,
+                            sensors_critical_values_top,
+                            sensors_critical_values_bottom,
                         )
         self.clear_ms_state(ms)
 
@@ -640,18 +654,24 @@ class ProgramRunner:
         sensor_states: list,
         sensor_stab_up_states: list,
         sensor_stab_down_states: list,
+        sensors_critical_values_top: dict,
+        sensors_critical_values_bottom: dict,
     ):
         if self.need_to_analyze:
             i = 0
-            for idx, value_bool in enumerate(us > 4.0):
-                if value_bool and sensor_stab_up_states[idx]:
+            for idx, u in enumerate(us):
+                sensor_state = sensor_states[idx]
+                top_critical_value = sensors_critical_values_top[sensor_state][idx]
+                bottom_critical_value = sensors_critical_values_bottom[sensor_state][
+                    idx
+                ]
+                if u > top_critical_value and sensor_stab_up_states[idx]:
                     sensor_states[idx] = min(sensor_states[idx] + 1, 3)
                     if sensor_states[idx] == 3:
                         sensor_stab_up_states[idx] = False
                     sensor_stab_down_states[idx] = True
                     i += 1
-            for idx, value_bool in enumerate(us < 1):
-                if value_bool and sensor_stab_down_states[idx]:
+                if u < bottom_critical_value and sensor_stab_down_states[idx]:
                     sensor_states[idx] = max(sensor_states[idx] - 1, 1)
                     sensor_stab_up_states[idx] = True
                     if sensor_states[idx] == 1:
