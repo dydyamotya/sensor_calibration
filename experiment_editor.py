@@ -10,14 +10,7 @@ import numpy as np
 
 
 class YAMLTreeItem:
-
-    types_mapping = {
-        int: "int",
-        float: "float",
-        dict: "dict",
-        list: "list",
-        str: "str"
-    }
+    types_mapping = {int: "int", float: "float", dict: "dict", list: "list", str: "str"}
 
     def __init__(self, name, data, parent_item=None):
         self._children = []
@@ -80,7 +73,8 @@ class YAMLTreeItem:
 
     def set_type(self, type_str):
         outer_types_mapping = dict(
-            zip(self.types_mapping.values(), self.types_mapping.keys()))
+            zip(self.types_mapping.values(), self.types_mapping.keys())
+        )
         if type_str not in outer_types_mapping:
             return False
         else:
@@ -99,19 +93,16 @@ class YAMLTreeItem:
 
     def add_child(self, row: int):
         if len(self._children) > 0:
-
             last_item = self._children[-1]
             if last_item._type_of_node not in [dict, list]:
-                item = YAMLTreeItem(str(row),
-                                    last_item._value,
-                                    parent_item=self)
+                item = YAMLTreeItem(str(row), last_item._value, parent_item=self)
             else:
                 item = YAMLTreeItem(str(row), "", parent_item=self)
         else:
             item = YAMLTreeItem(str(row), "", parent_item=self)
         self._children.insert(row, item)
 
-    def delete_child(self, row: int): 
+    def delete_child(self, row: int):
         if len(self._children) > 0:
             self._children.pop(row)
 
@@ -120,35 +111,30 @@ class YAMLTreeItem:
             return self._type_of_node(self._value)
         else:
             if self._type_of_node == dict:
-                return {
-                    child._name: child.collect()
-                    for child in self._children
-                }
+                return {child._name: child.collect() for child in self._children}
             elif self._type_of_node == list:
                 return [child.collect() for child in self._children]
 
 
 class YAMLTreeModel(QtCore.QAbstractItemModel):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._root_item = None
 
     def setModelData(self, stage: Stage):
         self._stage = stage
-        self._root_item = YAMLTreeItem("root",
-                                       self._stage.to_dict(for_ui=True))
+        self._root_item = YAMLTreeItem("root", self._stage.to_dict(for_ui=True))
 
-    def index(self, row: int, column: int,
-              parent: QtCore.QModelIndex) -> QtCore.QModelIndex:
+    def index(
+        self, row: int, column: int, parent: QtCore.QModelIndex
+    ) -> QtCore.QModelIndex:
         if not self.hasIndex(row, column, parent):
             return QtCore.QModelIndex()
 
         if not parent.isValid():
             parent_item: YAMLTreeItem = self._root_item
         else:
-            parent_item: YAMLTreeItem = parent.internalPointer(
-            )  # pyright: ignore
+            parent_item: YAMLTreeItem = parent.internalPointer()  # pyright: ignore
 
         child_item = parent_item.child(row)
         if child_item is not None:
@@ -181,8 +167,7 @@ class YAMLTreeModel(QtCore.QAbstractItemModel):
         if not parent.isValid():
             parent_item = self._root_item
         else:
-            parent_item: YAMLTreeItem = parent.internalPointer(
-            )  # pyright: ignore
+            parent_item: YAMLTreeItem = parent.internalPointer()  # pyright: ignore
         return parent_item.childCount()
 
     def columnCount(self, parent: QtCore.QModelIndex) -> int:
@@ -194,9 +179,13 @@ class YAMLTreeModel(QtCore.QAbstractItemModel):
             columnCount = 0
         return columnCount
 
-    def headerData(self, section: int, orientation: QtCore.Qt.Orientation,
-                   role: int) -> typing.Any:
-        if orientation == QtCore.Qt.Orientation.Horizontal and role == QtCore.Qt.DisplayRole:
+    def headerData(
+        self, section: int, orientation: QtCore.Qt.Orientation, role: int
+    ) -> typing.Any:
+        if (
+            orientation == QtCore.Qt.Orientation.Horizontal
+            and role == QtCore.Qt.DisplayRole
+        ):
             if section == 0:
                 return "Key"
             elif section == 1:
@@ -205,8 +194,7 @@ class YAMLTreeModel(QtCore.QAbstractItemModel):
                 return "Type"
         return None
 
-    def setData(self, index: QtCore.QModelIndex, value: typing.Any,
-                role: int) -> bool:
+    def setData(self, index: QtCore.QModelIndex, value: typing.Any, role: int) -> bool:
         item: YAMLTreeItem = index.internalPointer()  # pyright: ignore
         if role == QtCore.Qt.EditRole:
             if index.column() == 1:
@@ -248,31 +236,30 @@ class YAMLTreeModel(QtCore.QAbstractItemModel):
 
     def removeRows(self, row: int, count: int, parent: QtCore.QModelIndex) -> bool:
         if parent.isValid():
-            parent_item: YAMLTreeItem = parent.internalPointer() # pyright: ignore
+            parent_item: YAMLTreeItem = parent.internalPointer()  # pyright: ignore
         else:
             return False
 
         child_item = parent_item.child(row)
         if child_item is None:
             return False
-        
-        self.beginRemoveRows(parent, row, row + count - 1) 
+
+        self.beginRemoveRows(parent, row, row + count - 1)
         result = parent_item.delete_child(row)
-        if result: 
+        if result:
             self.endRemoveRows()
             return False
-        self.dataChanged.emit(self.index(row + 1, 0, parent),
-                              self.index(row + count, 2, parent),
-                              QtCore.Qt.EditRole)
+        self.dataChanged.emit(
+            self.index(row + 1, 0, parent),
+            self.index(row + count, 2, parent),
+            QtCore.Qt.EditRole,
+        )
         self.endRemoveRows()
         return True
 
-
-    def insertRows(self, row: int, count: int,
-                   parent: QtCore.QModelIndex) -> bool:
+    def insertRows(self, row: int, count: int, parent: QtCore.QModelIndex) -> bool:
         if parent.isValid():
-            parent_item: YAMLTreeItem = parent.internalPointer(
-            )  # pyright: ignore
+            parent_item: YAMLTreeItem = parent.internalPointer()  # pyright: ignore
         else:
             if self._root_item is None:
                 return False
@@ -285,15 +272,16 @@ class YAMLTreeModel(QtCore.QAbstractItemModel):
         if child_item._type_of_node in [list, dict]:
             new_rows = child_item.childCount()
             child_modelindex = self.index(row, 0, parent)
-            self.beginInsertRows(child_modelindex, new_rows,
-                                 new_rows + count - 1)
+            self.beginInsertRows(child_modelindex, new_rows, new_rows + count - 1)
 
             for i in range(new_rows, new_rows + count):
                 child_item.add_child(i)
             self.endInsertRows()
-            self.dataChanged.emit(self.index(new_rows, 0, parent),
-                                  self.index(new_rows + count - 1, 2, parent),
-                                  QtCore.Qt.EditRole)
+            self.dataChanged.emit(
+                self.index(new_rows, 0, parent),
+                self.index(new_rows + count - 1, 2, parent),
+                QtCore.Qt.EditRole,
+            )
         else:
             if parent_item is self._root_item:
                 return False
@@ -302,16 +290,17 @@ class YAMLTreeModel(QtCore.QAbstractItemModel):
             for i in range(row + 1, row + 1 + count):
                 parent_item.add_child(i)
             self.endInsertRows()
-            self.dataChanged.emit(self.index(row + 1, 0, parent),
-                                  self.index(row + count, 2, parent),
-                                  QtCore.Qt.EditRole)
+            self.dataChanged.emit(
+                self.index(row + 1, 0, parent),
+                self.index(row + count, 2, parent),
+                QtCore.Qt.EditRole,
+            )
 
     def collect(self):
         return self._root_item.collect()
 
 
 class StageItem(QtWidgets.QListWidgetItem):
-
     def __init__(self, stage: Stage, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.stage = stage
@@ -322,7 +311,6 @@ class StageItem(QtWidgets.QListWidgetItem):
 
 
 class ListOfStages(QtWidgets.QListWidget):
-
     redraw_plot_signal = QtCore.Signal(np.ndarray, np.ndarray)
 
     def __init__(self, *args, **kwargs):
@@ -336,8 +324,9 @@ class ListOfStages(QtWidgets.QListWidget):
         program_generator_gen = program_generator.parse_program_to_queue()
         times = []
         temperatures = []
-        progress = QtWidgets.QProgressDialog("Generating plot", "Stop",
-                                             0, full_time, self)
+        progress = QtWidgets.QProgressDialog(
+            "Generating plot", "Stop", 0, full_time, self
+        )
         progress.setWindowModality(QtCore.Qt.WindowModal)
         for time_next, (temperatures_, _, _, _) in program_generator_gen:
             times.append(time_next)
@@ -362,7 +351,8 @@ class ListOfStages(QtWidgets.QListWidget):
             row = self.indexFromItem(item).row()
             self.takeItem(row)
             self.setCurrentItem(
-                self.item(row if self.count() > row else self.count() - 1))
+                self.item(row if self.count() > row else self.count() - 1)
+            )
 
     def clear_stages(self):
         for i in range(self.count()):
@@ -402,10 +392,10 @@ class ListOfStages(QtWidgets.QListWidget):
 
 
 class StagePropertiesWidget(QtWidgets.QListWidget):
-
     plus_button_clicked_signal = QtCore.Signal()
     minus_button_clicked_signal = QtCore.Signal()
     signal_to_redraw_plot_signal = QtCore.Signal()
+    import_temperature_profile_signal = QtCore.Signal()
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -413,11 +403,12 @@ class StagePropertiesWidget(QtWidgets.QListWidget):
         self.stage_item = None
         self.stages_history = {}
 
-        self.model = YAMLTreeModel(self)
-        self.model.dataChanged.connect(self._update_stage_item)
+        self.yaml_tree_model = YAMLTreeModel(self)
+        self.yaml_tree_model.dataChanged.connect(self._update_stage_item)
 
         self.plus_button_clicked_signal.connect(self.addRowToModel)
         self.minus_button_clicked_signal.connect(self.deleteRowFromModel)
+        self.import_temperature_profile_signal.connect(self.import_temperature_profile)
 
     @QtCore.Slot(StageItem)  # pyright: ignore
     def draw_stage(self, stage_item: StageItem):
@@ -435,7 +426,7 @@ class StagePropertiesWidget(QtWidgets.QListWidget):
         main_layout.addLayout(buttons_layout)
 
         self.treeview = QtWidgets.QTreeView()
-        self.treeview.setModel(self.model)
+        self.treeview.setModel(self.yaml_tree_model)
 
         main_layout.addWidget(self.treeview)
 
@@ -447,7 +438,16 @@ class StagePropertiesWidget(QtWidgets.QListWidget):
         minus_button = QtWidgets.QPushButton("-")
         minus_button.clicked.connect(self.minus_button_clicked_signal)
 
+        self.import_temperature_profile_button = QtWidgets.QPushButton(
+            "Import temperature profile"
+        )
+        self.import_temperature_profile_button.clicked.connect(
+            self.import_temperature_profile_signal
+        )
+        self.import_temperature_profile_button.setVisible(False)
+
         rows_buttons_layout.addStretch(1)
+        rows_buttons_layout.addWidget(self.import_temperature_profile_button)
         rows_buttons_layout.addWidget(plus_button)
         rows_buttons_layout.addWidget(minus_button)
 
@@ -461,7 +461,8 @@ class StagePropertiesWidget(QtWidgets.QListWidget):
 
         self.stage_type_button_group.buttonClicked.connect(self._redraw_bottom)
         self.stage_type_button_group.buttonClicked.emit(
-            self.stage_type_button_group.checkedButton())
+            self.stage_type_button_group.checkedButton()
+        )
 
     @QtCore.Slot(QtWidgets.QAbstractButton)  # pyright: ignore
     def _redraw_bottom(self, button: QtWidgets.QAbstractButton):
@@ -473,13 +474,14 @@ class StagePropertiesWidget(QtWidgets.QListWidget):
             self.stages_history[type_name] = stage
 
         # fill with values
-        self.model.beginResetModel()
-        self.model.setModelData(stage)
-        self.model.endResetModel()
+        self.yaml_tree_model.beginResetModel()
+        self.yaml_tree_model.setModelData(stage)
+        self.yaml_tree_model.endResetModel()
         self.treeview.expandAll()
-        for i in range(self.model.columnCount(QtCore.QModelIndex())):
+        for i in range(self.yaml_tree_model.columnCount(QtCore.QModelIndex())):
             self.treeview.resizeColumnToContents(i)
         # suitable_widget.value_changed.connect(self._update_stage_item) # pyright: ignore
+        self.import_temperature_profile_button.setVisible(stage.name == "cyclic")
 
         self._update_stage_item()
 
@@ -492,7 +494,6 @@ class StagePropertiesWidget(QtWidgets.QListWidget):
         except KeyError:
             pass
         else:
-
             dict_collected = self.treeview.model().collect()
             stage = stage.from_dict(dict_collected)
             self.stages_history[type_name] = stage
@@ -504,17 +505,49 @@ class StagePropertiesWidget(QtWidgets.QListWidget):
         first_qmodelindexes = self.treeview.selectedIndexes()
         if first_qmodelindexes is not None:
             modelindex = first_qmodelindexes[0]
-            self.model.insertRows(modelindex.row(), 1, modelindex.parent())
+            self.yaml_tree_model.insertRows(modelindex.row(), 1, modelindex.parent())
 
     def deleteRowFromModel(self):
         first_qmodelindexes = self.treeview.selectedIndexes()
         if first_qmodelindexes is not None:
             modelindex = first_qmodelindexes[0]
-            self.model.removeRows(modelindex.row(), 1, modelindex.parent())
+            self.yaml_tree_model.removeRows(modelindex.row(), 1, modelindex.parent())
+
+    def import_temperature_profile(self):
+        # import temperature profile from file
+        filename, *_ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            "Выберите файл с температурным профилем",
+            "./",
+            "Profile files (*.dat)",
+        )
+        if filename:
+            with open(filename) as fd:
+                times_and_temperatures = np.loadtxt(fd)
+            try:
+                stage = self.stages_history["cyclic"]
+            except KeyError:
+                pass
+            else:
+                model_dict = stage.to_dict()
+                model_dict["temperatures"]["time"] = (
+                    times_and_temperatures[:, 0] / 1000
+                ).tolist()
+                model_dict["temperatures"]["temperature"] = times_and_temperatures[
+                    :, 1
+                ].tolist()
+                new_stage = stage.from_dict(model_dict)
+                self.stages_history["cyclic"] = new_stage
+                self.yaml_tree_model.beginResetModel()
+                self.yaml_tree_model.setModelData(new_stage)
+                self.yaml_tree_model.endResetModel()
+                self.treeview.expandAll()
+                for i in range(self.yaml_tree_model.columnCount(QtCore.QModelIndex())):
+                    self.treeview.resizeColumnToContents(i)
+                self._update_stage_item()
 
 
 class FilesWidget(QtWidgets.QWidget):
-
     file_open_signal = QtCore.Signal(str)
     file_save_signal = QtCore.Signal(str)
 
@@ -536,8 +569,11 @@ class FilesWidget(QtWidgets.QWidget):
 
     def open_callback(self):
         filename, *_ = QtWidgets.QFileDialog.getOpenFileName(
-            self, "Open experiment file", self.base_path,
-            "Experiment files (*.yaml *.yml)")
+            self,
+            "Open experiment file",
+            self.base_path,
+            "Experiment files (*.yaml *.yml)",
+        )
         if not filename:
             return
         self.path_lineedit.setText(filename)
@@ -545,8 +581,11 @@ class FilesWidget(QtWidgets.QWidget):
 
     def save_callback(self):
         filename, *_ = QtWidgets.QFileDialog.getSaveFileName(
-            self, "Save experiment file", self.base_path,
-            "Experiment files (*.yaml *.yml)")
+            self,
+            "Save experiment file",
+            self.base_path,
+            "Experiment files (*.yaml *.yml)",
+        )
         if not filename:
             return
         self.path_lineedit.setText(filename)
@@ -554,9 +593,7 @@ class FilesWidget(QtWidgets.QWidget):
 
 
 class PlotWidget(QtWidgets.QWidget):
-
     def __init__(self, *args, **kwargs):
-
         super().__init__(*args, **kwargs)
         QtWidgets.QHBoxLayout(self)
         self.plot_widget = pg.PlotWidget(self)
@@ -574,7 +611,6 @@ class PlotWidget(QtWidgets.QWidget):
 
 
 class ExperimentEditorWidget(QtWidgets.QWidget):
-
     def __init__(self, settings, parent, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -583,8 +619,9 @@ class ExperimentEditorWidget(QtWidgets.QWidget):
         self.settings = settings
         self.py_parent = parent
 
-        experiment_path = self.settings.value("operation_widget_programs_path",
-                                              "./tests")
+        experiment_path = self.settings.value(
+            "operation_widget_programs_path", "./tests"
+        )
 
         self.files_widget = FilesWidget(experiment_path)
 
@@ -598,23 +635,24 @@ class ExperimentEditorWidget(QtWidgets.QWidget):
         self.stage_properties_widget = StagePropertiesWidget()
 
         self.list_of_stages_widget.currentItemChanged.connect(
-            self.stage_properties_widget.draw_stage)
+            self.stage_properties_widget.draw_stage
+        )
 
         self.list_of_stages_plus_button.clicked.connect(
-            self.list_of_stages_widget.add_stage)
+            self.list_of_stages_widget.add_stage
+        )
         self.list_of_stages_minus_button.clicked.connect(
-            self.list_of_stages_widget.remove_stage)
+            self.list_of_stages_widget.remove_stage
+        )
 
-        self.files_widget.file_open_signal.connect(
-            self.list_of_stages_widget.load_file)
-        self.files_widget.file_save_signal.connect(
-            self.list_of_stages_widget.save_file)
+        self.files_widget.file_open_signal.connect(self.list_of_stages_widget.load_file)
+        self.files_widget.file_save_signal.connect(self.list_of_stages_widget.save_file)
 
-        # self.stage_properties_widget.signal_to_redraw_plot_signal.connect(self.list_of_stages_widget.redraw_plot)
         redraw_button.clicked.connect(self.list_of_stages_widget.redraw_plot)
 
         self.list_of_stages_widget.redraw_plot_signal.connect(
-            self.plot_widget.plot_data)
+            self.plot_widget.plot_data
+        )
 
         # Layout
         main_layout = QtWidgets.QVBoxLayout(self)
