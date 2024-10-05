@@ -72,6 +72,8 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
                 )
                 .group_by(SensorPosition.r4)
             )
+            if len(self.sensor_positions) == 0:
+                raise IndexError
         except (IndexError, SensorPosition.DoesNotExist):
             self.sensor_positions = None
             self.resistances_convertors_loaded = False
