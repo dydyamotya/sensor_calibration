@@ -112,7 +112,8 @@ class EquipmentSettings(QtWidgets.QWidget):
             return None
 
     def get_r4_data(self):
-        return self.modes_widget.get_data()
+        r4_data = self.modes_widget.get_data()
+        return r4_data
 
     def save_settings(self):
         self.global_settings.setValue(
