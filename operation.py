@@ -1,7 +1,6 @@
 import logging
 import pathlib
 import threading
-from queue import Queue
 from typing import TYPE_CHECKING
 
 import numpy as np

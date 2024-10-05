@@ -1,11 +1,11 @@
 from PySide2 import QtWidgets, QtCore
 from misc import clear_layout
-from program_generator_types import Stage, SimpleStage, dict_of_stage_types
+from operation_utils.program_generator_types import Stage, SimpleStage, dict_of_stage_types
 import typing
 import yaml
 import pathlib
 import pyqtgraph as pg
-from program_generator import ProgramGenerator
+from operation_utils.program_generator import ProgramGenerator
 import numpy as np
 
 

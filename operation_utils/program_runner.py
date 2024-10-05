@@ -1,5 +1,5 @@
-from program_generator import ProgramGenerator
-from ..sensor_system import MS_Uni, MS_ABC
+from .program_generator import ProgramGenerator
+from sensor_system import MS_Uni, MS_ABC
 from time import sleep, time
 import threading
 import traceback
