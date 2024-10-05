@@ -1,6 +1,3 @@
-import datetime
-import struct
-
 from PySide2 import QtWidgets, QtCore
 from PySide2.QtCore import Signal, QTimer, Qt
 from PySide2.QtGui import QPixmap, QColor
@@ -18,6 +15,7 @@ import threading
 import pyqtgraph as pg
 import traceback
 from queue import Queue
+from operation_utils.queue_runner import QueueRunner
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -89,171 +87,6 @@ class LinesDrawButton(QtWidgets.QPushButton):
             label.setVisible(idx < number)
             pixmap.setVisible(idx < number)
             pixmap.set_true()
-
-
-class QueueRunner:
-    def __init__(
-        self,
-        queue: Queue,
-        converters_func_voltage_to_r,
-        multirange_state_func,
-        save_folder,
-    ):
-        self.queue = queue
-        self.thread = None
-        self.hold_method = None
-        self.stopped = True
-        self.filename = None
-        self.save_folder = save_folder
-        self.converter_funcs_dicts = converters_func_voltage_to_r
-        self.multirange_state_func = multirange_state_func
-        self._meas_values_tuple = None
-        self.meas_tuple_lock = threading.Lock()
-
-    def set_hold(self, hold_method):
-        self.hold_method = hold_method
-
-    def drop_hold_method(self):
-        self.hold_method = None
-
-    def get_meas_tuple(self):
-        with self.meas_tuple_lock:
-            return self._meas_values_tuple
-
-    def set_meas_tuple(self, values):
-        with self.meas_tuple_lock:
-            self._meas_values_tuple = values
-
-    def start(self):
-        if self.hold_method is not None and self.stopped:
-            self.stopped = False
-            self.thread = threading.Thread(target=self.cycle)
-            self.filename = (
-                pathlib.Path(self.save_folder)
-                / datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-            ).with_suffix(".txt")
-            self.binary_filename = (
-                pathlib.Path(self.save_folder)
-                / datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-            ).with_suffix(".dat")
-            self.thread.start()
-
-    def join(self):
-        if self.thread is not None:
-            self.thread.join()
-
-    def cycle(self):
-        fd_bin = self.binary_filename.open("wb")
-        headed = False
-
-        bin_write_struct = None
-        converter_funcs = self.converter_funcs_dicts()
-        multirange = self.multirange_state_func()
-        while not self.stopped:
-            sleep(0.02)
-            if not self.queue.empty():
-                data = self.queue.get()
-                (
-                    us,
-                    rs,
-                    time_next_plus_t0,
-                    time_next,
-                    temperatures,
-                    gas_state,
-                    stage_num,
-                    stage_type,
-                    sensor_states,
-                    converted,
-                ) = data
-                if multirange:
-                    sensor_resistances = tuple(
-                        converter_func_dict[sensor_state](u)
-                        for converter_func_dict, u, sensor_state in zip(
-                            converter_funcs, us, sensor_states
-                        )
-                    )
-                else:
-                    sensor_resistances = tuple(
-                        converter_func_dict(u)
-                        for converter_func_dict, u, sensor_state in zip(
-                            converter_funcs, us, sensor_states
-                        )
-                    )
-                logger.debug(f"Call in cycle")
-                self.set_meas_tuple(
-                    (us, rs, sensor_resistances, sensor_states, temperatures, converted)
-                )
-                self.hold_method((sensor_resistances, rs, time_next))
-                if not headed:
-                    sensors_number = len(rs)
-                    headed = True
-                    bin_write_struct = struct.Struct(
-                        "<f" + sensors_number * 4 * "f" + "BIH" + sensors_number * "B"
-                    )
-                    fd_bin.write(struct.pack("<B", sensors_number))
-                fd_bin.write(
-                    bin_write_struct.pack(
-                        time_next,
-                        *us,
-                        *rs,
-                        *sensor_resistances,
-                        *temperatures,
-                        gas_state,
-                        stage_num,
-                        stage_type,
-                        *sensor_states,
-                    )
-                )
-        while not self.queue.empty():
-            data = self.queue.get()
-            (
-                us,
-                rs,
-                time_next_plus_t0,
-                time_next,
-                temperatures,
-                gas_state,
-                stage_num,
-                stage_type,
-                sensor_states,
-                converted,
-            ) = data
-            sensor_resistances = tuple(
-                converter_func_dict[sensor_state](u)
-                for converter_func_dict, u, sensor_state in zip(
-                    converter_funcs, us, sensor_states
-                )
-            )
-            logger.debug(f"Call in cycle")
-            self.set_meas_tuple(
-                (us, rs, sensor_resistances, sensor_states, temperatures, converted)
-            )
-            self.hold_method((sensor_resistances, rs, time_next))
-            if not headed:
-                sensors_number = len(rs)
-                headed = True
-                bin_write_struct = struct.Struct(
-                    "<f" + sensors_number * 4 * "f" + "BIH" + sensors_number * "B"
-                )
-                fd_bin.write(struct.pack("<B", sensors_number))
-            fd_bin.write(
-                bin_write_struct.pack(
-                    time_next,
-                    *us,
-                    *rs,
-                    *sensor_resistances,
-                    *temperatures,
-                    gas_state,
-                    stage_num,
-                    stage_type,
-                    *sensor_states,
-                )
-            )
-
-        fd_bin.close()
-
-    def stop(self):
-        self.stopped = True
 
 
 class OperationWidget(QtWidgets.QWidget):
