@@ -16,6 +16,7 @@ from misc import ClickableLabel, Lamp
 from operation_utils.program_generator import ProgramGenerator
 from operation_utils.queue_runner import QueueRunner
 from operation_utils.program_runner import ProgramRunner
+from operation_utils.queues_holder import QueuesHolder
 
 if TYPE_CHECKING:
     from equipment_settings import EquipmentSettings
@@ -107,12 +108,12 @@ class OperationWidget(QtWidgets.QWidget):
         self.gasstate_widget = parent.gasstate_widget
         self.runner = None
         self.generator = None
-        self.queue = Queue()
+        self.queues_holder = QueuesHolder()
         save_folder = self.global_settings.value(
             "operation_widget_save_path", "./tests"
         )
         self.queue_runner = QueueRunner(
-            self.queue,
+            self.queues_holder.add_new_queue(),
             self.measurement_widget.get_voltage_to_resistance_funcs,
             self.measurement_widget.get_multirange_status,
             save_folder,
@@ -251,7 +252,7 @@ class OperationWidget(QtWidgets.QWidget):
                 multirange,
                 self.gasstate_widget.send_gasstate_signal,
                 self.get_checkbox_state,
-                self.queue,
+                self.queues_holder,
                 self.stop_signal,
                 self.running_signal,
                 sensor_number,
