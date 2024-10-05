@@ -4,9 +4,9 @@ import struct
 from PySide2 import QtWidgets, QtCore
 from PySide2.QtCore import Signal, QTimer, Qt
 from PySide2.QtGui import QPixmap, QColor
-from PySide2.QtWidgets import QFrame, QSizePolicy
+from PySide2.QtWidgets import QFrame
 
-from misc import clear_layout, ClickableLabel, Lamp
+from misc import ClickableLabel, Lamp
 from sensor_system import MS_Uni, MS_ABC
 import pathlib
 import yaml
@@ -16,6 +16,7 @@ from time import time, sleep
 import numpy as np
 import threading
 import pyqtgraph as pg
+import traceback
 from queue import Queue
 from typing import TYPE_CHECKING
 
@@ -416,7 +417,7 @@ class OperationWidget(QtWidgets.QWidget):
                 self.measurement_widget.get_convert_funcs,
                 self.get_range_mode_settings(),
                 multirange,
-                self.gasstate_widget.send_state,
+                self.gasstate_widget.send_gasstate_signal,
                 self.get_checkbox_state,
                 self.queue,
                 self.stop_signal,
@@ -513,7 +514,7 @@ class ProgramRunner:
         get_convert_funcs,
         solid_mode,
         multirange,
-        send_gasstate_func,
+        send_gasstate_signal,
         checkbox_state,
         queue,
         stop_signal,
@@ -533,7 +534,7 @@ class ProgramRunner:
         self.convert_funcs_2 = get_convert_funcs("V")
         self.solid_mode = solid_mode
         self.multirange: bool = multirange
-        self.send_gasstate_func = send_gasstate_func
+        self.send_gasstate_signal = send_gasstate_signal
         self.checkbox_state = checkbox_state
         self.sensor_number = sensor_number
         self.thread = None
@@ -608,9 +609,9 @@ class ProgramRunner:
                     raise
                 else:
                     try:
-                        self.send_gasstate_func(gas_state)
+                        self.send_gasstate_signal.emit(gas_state)
                     except:
-                        logger.error("Cant send gas_state")
+                        logger.error(traceback.format_exc())
                     finally:
                         self.queue.put(
                             (
