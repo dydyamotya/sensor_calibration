@@ -1,5 +1,9 @@
 from PySide2 import QtWidgets, QtCore
 
+import logging 
+
+logger = logging.getLogger(__name__)
+
 from database_widgets import (
     DatabaseLeaderComboboxWidget,
     DatabaseNonleaderComboboxWidget,
@@ -105,10 +109,12 @@ class EquipmentSettings(QtWidgets.QWidget):
 
     def get_new_ms(self):
         if not self.running_program:
-            return MS_Uni(
-                self.sensor_number_widget.get_value(), self.comport_widget.get_value()
-            )
+            number_of_sensors = self.sensor_number_widget.get_value()
+            serial_port = self.comport_widget.get_value() 
+            logger.debug(f"New MS device created on port {serial_port} with {number_of_sensors} sensors")
+            return MS_Uni( number_of_sensors, serial_port)
         else:
+            logger.debug("No device created because program is running")
             return None
 
     def get_r4_data(self):
