@@ -24,3 +24,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.plotter_experiment_widget = ExperimentPlotter()
         self.converter_widget = ConverterWidget(settings)
         self.experiment_editor_widget = ExperimentEditorWidget(settings, self)
+
+    def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+        self.gasstate_widget.save_to_settings()
+        return super().closeEvent(event)

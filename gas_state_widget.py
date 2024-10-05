@@ -9,7 +9,10 @@ class GasStateWidget(QtWidgets.QWidget):
         layout = QtWidgets.QFormLayout()
         self.setLayout(layout)
         self.setWindowTitle("Settings")
-        self.global_settings = global_settings
+        self.global_settings: QtCore.QSettings = global_settings
+
+        self.enabled_checkbox = QtWidgets.QCheckBox()
+        layout.addRow("Enabled:", self.enabled_checkbox)
 
         self.gas_state_server_address = QtWidgets.QLineEdit()
         layout.addRow("GasState Server IP:", self.gas_state_server_address)
@@ -20,7 +23,21 @@ class GasStateWidget(QtWidgets.QWidget):
         self.gas_state_test.returnPressed.connect(self.send_state_test)
         self.prev_gas_state = None
 
+    def load_from_settings(self):
+        gas_state_server_enabled_value = self.global_settings.value('gas_state_server_enabled', type=bool)
+        if gas_state_server_enabled_value is not None:
+            self.enabled_checkbox.setEnabled(bool(gas_state_server_enabled_value))
+        gas_state_server_address_value = self.global_settings.value('gas_state_server_address', type=str)
+        if gas_state_server_address_value is not None:
+            self.gas_state_server_address.setText(str(gas_state_server_address_value))
+
+    def save_to_settings(self):
+        self.global_settings.setValue('gas_state_server_enabled', self.enabled_checkbox.isEnabled())
+        self.global_settings.setValue('gas_state_server_address', self.gas_state_server_address.text())
+
     def send_state(self, state_num: int):
+        if not self.enabled_checkbox.isEnabled():
+            return
         if state_num != self.prev_gas_state:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(0.001)
