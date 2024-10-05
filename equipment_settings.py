@@ -1,6 +1,6 @@
-from PySide2 import QtWidgets, QtCore
+import logging
 
-import logging 
+from PySide2 import QtCore, QtWidgets
 
 logger = logging.getLogger(__name__)
 
@@ -9,7 +9,6 @@ from database_widgets import (
     DatabaseNonleaderComboboxWidget,
     DatabaseNonleaderTableWidget,
 )
-from misc import FileDialogLineEdit
 from models import Machine, SensorPosition
 from pyside_constructor_widgets.widgets import comports_list
 from sensor_system import MS_Uni
@@ -146,35 +145,3 @@ class EquipmentSettings(QtWidgets.QWidget):
             sensor_position.delete_instance()
 
 
-class PathsWidget(QtWidgets.QWidget):
-    def __init__(self, global_settings, *args, **kwargs):
-        super().__init__(*args, f=QtCore.Qt.Tool, **kwargs)
-        main_layout = QtWidgets.QFormLayout(self)
-        self.setWindowTitle("Paths settings")
-        self.global_settings = global_settings
-
-        main_layout.addWidget(QtWidgets.QLabel("To edit double-click or press Enter"))
-
-        self.paths_settings = [
-            "operation_widget_save_path",
-            "operation_widget_programs_path",
-            "calibration_widget_res_path",
-            "calibration_widget_par_path",
-            "calibration_widget_cal_path",
-            "import_calibration_widget",
-        ]
-
-        self.lineedits = []
-        for path in self.paths_settings:
-            lineedit = FileDialogLineEdit(self.global_settings, path)
-            main_layout.addRow(path, lineedit)
-            self.lineedits.append(lineedit)
-
-    def toggle_visibility(self):
-        self.setVisible(not self.isVisible())
-        if self.isVisible():
-            self.refresh_values()
-
-    def refresh_values(self):
-        for path, lineedit in zip(self.paths_settings, self.lineedits):
-            lineedit.setText(self.global_settings.value(path, "./tests"))

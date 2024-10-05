@@ -1,6 +1,7 @@
 from PySide2 import QtWidgets, QtGui, QtCore
 
-from equipment_settings import EquipmentSettings, PathsWidget
+from equipment_settings import EquipmentSettings
+from menus_widgets.paths_widget import PathsWidget
 from gas_state_widget import GasStateWidget
 from u_calibration import ImportCalibrationWidget
 from plotter import ExperimentPlotter
