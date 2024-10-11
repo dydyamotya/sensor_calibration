@@ -4,7 +4,7 @@ import logging
 
 from choosebestcomb import ChooseBestCombinationOfSensorsWidget
 from main_window import MyMainWindow
-from u_calibration import UCalibrationWidget
+from u_calibration.u_calibration_widget import UCalibrationWidget
 from calibration import CalibrationWidget
 from measurement import MeasurementWidget
 from operation import OperationWidget

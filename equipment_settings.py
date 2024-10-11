@@ -109,10 +109,10 @@ class EquipmentSettings(QtWidgets.QWidget):
     def get_comport(self):
         return self.comport_widget.get_value()
 
-    def get_sensor_number(self):
+    def get_sensor_number(self) -> int:
         return self.sensor_number_widget.get_value()
 
-    def get_multirange(self):
+    def get_multirange(self) -> bool:
         return self.multirange_widget.get_value()
 
     def get_new_ms(self):

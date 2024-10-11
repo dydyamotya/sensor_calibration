@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class QueueRunner:
     def __init__(
         self,
-        queue: Queue[MSOneTickClass],
+        queue: Queue,
         converters_func_voltage_to_r,
         multirange_state_func,
         save_folder,
