@@ -106,12 +106,21 @@ class EquipmentSettings(QtWidgets.QWidget):
             self.machine_name_widget.get_id(),
         )
 
+    def get_comport(self):
+        return self.comport_widget.get_value()
+
+    def get_sensor_number(self):
+        return self.sensor_number_widget.get_value()
+
+    def get_multirange(self):
+        return self.multirange_widget.get_value()
+
     def get_new_ms(self):
         if not self.running_program:
             number_of_sensors = self.sensor_number_widget.get_value()
             serial_port = self.comport_widget.get_value() 
             logger.debug(f"New MS device created on port {serial_port} with {number_of_sensors} sensors")
-            return MS_Uni( number_of_sensors, serial_port)
+            return MS_Uni(number_of_sensors, serial_port)
         else:
             logger.debug("No device created because program is running")
             return None

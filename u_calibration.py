@@ -1,17 +1,21 @@
 import configparser
-import datetime
-
-from yaml import dump
-import numpy as np
-from scipy.optimize import curve_fit
-import platform
-
-from PySide2 import QtWidgets, QtCore, QtGui
 import logging
-import pyqtgraph as pg
-from models import SensorPosition
-from misc import clear_layout
 import pathlib
+import platform
+import typing
+import functools
+
+import numpy as np
+import pyqtgraph as pg
+from PySide2 import QtCore, QtGui, QtWidgets
+from scipy.optimize import curve_fit
+from yaml import dump
+
+from misc import clear_layout
+from models import SensorPosition
+
+if typing.TYPE_CHECKING:
+    from equipment_settings import EquipmentSettings
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +38,7 @@ class UCalibrationWidget(QtWidgets.QWidget):
         super().__init__(*args, **kwargs)
         self.debug_level = debug_level
         self.py_parent = py_parent
-        self.settings_widget = py_parent.settings_widget
+        self.settings_widget: "EquipmentSettings" = py_parent.settings_widget
         self.global_settings = global_settings
         self.import_widget = self.py_parent.import_widget
         self.settings_widget.calibration_redraw_signal.connect(self._init_ui)
@@ -88,16 +92,16 @@ class PlusWidget(QtWidgets.QWidget):
 
 class OneSensorFrame(QtWidgets.QWidget):
 
-    def __init__(self, master, settings, debug_level, global_settings,
+    def __init__(self, master, settings: "EquipmentSettings", debug_level, global_settings,
                  import_widget, *args, **kwargs):
         super().__init__(master, *args, **kwargs)
         self.settings_widget = settings
 
-        r4_str_values, r4_combobox_dict, r4_range_dict = self.settings_widget.get_r4_data()
         self.import_widget = import_widget
         self.debug_level = debug_level
         self.global_settings = global_settings
         self.labels = []
+
         main_layout = QtWidgets.QVBoxLayout(self)
         layout = QtWidgets.QGridLayout()
         main_layout.addLayout(layout)
@@ -108,52 +112,26 @@ class OneSensorFrame(QtWidgets.QWidget):
 
         row = 0
 
-        r4_widget = QtWidgets.QComboBox()
-        r4_widget.addItems(tuple(r4_combobox_dict.keys()))
-        r4_widget.setEditable(True)
-        layout.addWidget(r4_widget, row, 1)
+        self.r4_widget = QtWidgets.QComboBox()
+        if self.settings_widget.get_multirange():
+            _, r4_combobox_dict, _ = self.settings_widget.get_r4_data()
+            self.r4_widget.addItems(tuple(r4_combobox_dict.keys()))
+        
+        self.r4_widget.setEditable(True)
+        layout.addWidget(self.r4_widget, row, 1)
         layout.addWidget(QtWidgets.QLabel("R4: "), row, 0)
         row += 1
 
-        sensor_widget = QtWidgets.QComboBox()
-        sensor_widget.addItems(tuple(map(str, range(1, 13))))
-        sensor_widget.setEditable(False)
-        layout.addWidget(sensor_widget, row, 1)
+        self.sensor_widget = QtWidgets.QComboBox()
+        self.sensor_widget.addItems(tuple(map(str, range(1, 13))))
+        self.sensor_widget.setEditable(False)
+        layout.addWidget(self.sensor_widget, row, 1)
         layout.addWidget(QtWidgets.QLabel("Sensor #: "), row, 0)
         row += 1
 
         self.entries = dict(
             zip(r_labels_str,
                 (QtWidgets.QLineEdit(self) for i in range(len(r_labels_str)))))
-
-        def get_func(index):
-
-            def measure_u():
-                ms = self.settings_widget.get_new_ms()
-                if ms is not None:
-                    try:
-                        if r4_widget.currentText() in r4_str_values:
-                            ms.send_measurement_range(
-                                (r4_range_dict[r4_widget.currentText()], ) * 12)
-                        else:
-                            pass
-
-                        answers = [
-                            ms.full_request((0, ) * 12)[0] for _ in range(15)
-                        ]
-                        try:
-                            self.entries[r_labels_str[index]].setText(
-                                "{:2.5f}".format(
-                                    sum([
-                                        answer[int(sensor_widget.currentText()) -
-                                               1] for answer in answers[5:]
-                                    ]) / 10))
-                        except IndexError:
-                            logger.error("No sensor there")
-                    except:
-                        ms.close()
-
-            return measure_u
 
         buttons = dict(
             zip(r_labels_str,
@@ -162,7 +140,7 @@ class OneSensorFrame(QtWidgets.QWidget):
 
         for idx, (label, entry, button) in enumerate(
                 zip(r_labels_str, self.entries.values(), buttons.values())):
-            button.clicked.connect(get_func(idx))
+            button.clicked.connect(self.create_func_for_u_measuring(idx))
             button.setSizePolicy(QtWidgets.QSizePolicy.Minimum,
                                  QtWidgets.QSizePolicy.Expanding)
             label_widget = QtWidgets.QLabel(label)
@@ -190,7 +168,10 @@ class OneSensorFrame(QtWidgets.QWidget):
 
         def click_calc_button():
             k = 4.068
-            r4 = r4_combobox_dict[r4_widget.currentText()]
+            if self.settings_widget.get_multirange():
+                r4 = r4_combobox_dict[self.r4_widget.currentText()]
+            else:
+                r4 = float(self.r4_widget.currentText())
 
             def f(u, rs1, rs2):
                 return (rs1 - rs2) * r4 / ((2.5 + 2.5 * k - u) / k - rs2) - r4
@@ -217,8 +198,8 @@ class OneSensorFrame(QtWidgets.QWidget):
                 result_widget_2.setText("{:2.6f}".format(popt[1]))
 
                 PlotWidget(self, x, y, f, popt, self.global_settings,
-                           r4_widget.currentText(),
-                           sensor_widget.currentText(), self.settings_widget,
+                           self.r4_widget.currentText(),
+                           self.sensor_widget.currentText(), self.settings_widget,
                            self.import_widget)
 
         calc_button = QtWidgets.QPushButton(text="Calc coeffs")
@@ -254,6 +235,42 @@ class OneSensorFrame(QtWidgets.QWidget):
         for widget, text in zip(self.entries.values(), test_values):
             widget.setText(text)
 
+    def create_func_for_u_measuring(self, index: int):
+        return functools.partial(self.measure_u, index)
+
+    def measure_u(self, index: int):
+        ms = self.settings_widget.get_new_ms()
+        if ms is not None:
+            if self.settings_widget.get_multirange():
+                _, _, r4_range_dict = self.settings_widget.get_r4_data()
+                try:
+                    ms.send_measurement_range(
+                        (r4_range_dict[self.r4_widget.currentText()], ) * 12)
+
+                    us_answers = self.get_us_from_ms(ms)
+                    average_u = self.calculate_average_u(us_answers)
+                    self.record_u(index, average_u)
+                except:
+                    ms.close()
+            else:
+                us_answers = self.get_us_from_ms(ms)
+                average_u = self.calculate_average_u(us_answers)
+                self.record_u(index, average_u)
+
+    def get_us_from_ms(self, ms):
+        return [
+            ms.full_request((0, ) * 12)[0] for _ in range(15)
+        ]
+
+    def calculate_average_u(self, us):
+        return sum([ u[int(self.sensor_widget.currentText()) - 1] for u in us[5:]]) / 10
+
+    def record_u(self, index, average_u):
+        self.entries[r_labels_str[index]].setText( "{:2.5f}".format(average_u))
+
+
+
+
 
 class PlotWidget(QtWidgets.QWidget):
 
@@ -263,7 +280,6 @@ class PlotWidget(QtWidgets.QWidget):
 
         self.global_settings = global_settings
         self.settings_widget = settings_widget
-        self.r4_str_values, *_ = self.settings_widget.get_r4_data()
         self.import_widget = import_widget
         self.r4 = r4
         self.sensor_num = sensor_num
@@ -328,15 +344,17 @@ class PlotWidget(QtWidgets.QWidget):
         sensor_num = int(self.sensor_num)
         x = dump(list(self.x), default_flow_style=True)
         y = dump(self.y.tolist(), default_flow_style=True)
-        if self.r4 in self.r4_str_values:
+        if self.settings_widget.get_multirange():
+            self.r4_str_values, *_ = self.settings_widget.get_r4_data()
+            if self.r4 in self.r4_str_values:
 
-            r4_index = self.r4_str_values.index(self.r4) + 1
-            self.global_settings.setValue(f"Rs_U1_{sensor_num}_{r4_index}",
-                                          float(self.popt[0]))
-            self.global_settings.setValue(f"Rs_U2_{sensor_num}_{r4_index}",
-                                          float(self.popt[1]))
-            self.global_settings.setValue(f"X_{sensor_num}_{r4_index}", x)
-            self.global_settings.setValue(f"Y_{sensor_num}_{r4_index}", y)
+                r4_index = self.r4_str_values.index(self.r4) + 1
+                self.global_settings.setValue(f"Rs_U1_{sensor_num}_{r4_index}",
+                                            float(self.popt[0]))
+                self.global_settings.setValue(f"Rs_U2_{sensor_num}_{r4_index}",
+                                            float(self.popt[1]))
+                self.global_settings.setValue(f"X_{sensor_num}_{r4_index}", x)
+                self.global_settings.setValue(f"Y_{sensor_num}_{r4_index}", y)
         else:
             self.global_settings.setValue(f"Rs_U1_{sensor_num}", self.popt[0])
             self.global_settings.setValue(f"Rs_U2_{sensor_num}", self.popt[1])
