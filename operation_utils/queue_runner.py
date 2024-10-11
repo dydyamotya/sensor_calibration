@@ -1,4 +1,5 @@
 from queue import Queue
+from program_dataclasses.operation_classes import MSOneTickClass
 import threading
 import pathlib
 import datetime
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 class QueueRunner:
     def __init__(
         self,
-        queue: Queue,
+        queue: Queue[MSOneTickClass],
         converters_func_voltage_to_r,
         multirange_state_func,
         save_folder,
@@ -76,55 +77,48 @@ class QueueRunner:
         fd_bin.close()
 
     def one_cycle_step(self, multirange: bool, converter_funcs, fd_bin):
-        data = self.queue.get()
-        (
-            us,
-            rs,
-            time_next_plus_t0,
-            time_next,
-            temperatures,
-            gas_state,
-            stage_num,
-            stage_type,
-            sensor_states,
-            converted,
-        ) = data
+        one_tick_data = self.queue.get()
         if multirange:
             sensor_resistances = tuple(
                 converter_func_dict[sensor_state](u)
                 for converter_func_dict, u, sensor_state in zip(
-                    converter_funcs, us, sensor_states
+                    converter_funcs, one_tick_data.us, one_tick_data.sensor_states
                 )
             )
         else:
             sensor_resistances = tuple(
                 converter_func_dict(u)
                 for converter_func_dict, u, sensor_state in zip(
-                    converter_funcs, us, sensor_states
+                    converter_funcs, one_tick_data.us, one_tick_data.sensor_states
                 )
             )
         logger.debug(f"Call in cycle")
         self.set_meas_tuple(
-            (us, rs, sensor_resistances, sensor_states, temperatures, converted)
+            (one_tick_data.us,
+             one_tick_data.rs,
+             sensor_resistances,
+             one_tick_data.sensor_states,
+             one_tick_data.temperatures,
+             one_tick_data.converted)
         )
-        self.hold_method((sensor_resistances, rs, time_next))
+        self.hold_method((sensor_resistances, one_tick_data.rs, one_tick_data.time_next))
         if self.bin_write_struct is None:
-            sensors_number = len(rs)
+            sensors_number = len(one_tick_data.rs)
             self.bin_write_struct = struct.Struct(
                 "<f" + sensors_number * 4 * "f" + "BIH" + sensors_number * "B"
             )
             fd_bin.write(struct.pack("<B", sensors_number))
         fd_bin.write(
             self.bin_write_struct.pack(
-                time_next,
-                *us,
-                *rs,
+                one_tick_data.time_next,
+                *one_tick_data.us,
+                *one_tick_data.rs,
                 *sensor_resistances,
-                *temperatures,
-                gas_state,
-                stage_num,
-                stage_type,
-                *sensor_states,
+                *one_tick_data.temperatures,
+                one_tick_data.gas_state,
+                one_tick_data.stage_num,
+                one_tick_data.stage_type,
+                *one_tick_data.sensor_states,
             )
         )
 

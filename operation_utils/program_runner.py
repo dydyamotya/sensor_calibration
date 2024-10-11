@@ -1,4 +1,5 @@
 from .program_generator import ProgramGenerator
+from program_dataclasses.operation_classes import MSOneTickClass
 from sensor_system import MS_Uni, MS_ABC
 from time import sleep, time
 import threading
@@ -19,7 +20,7 @@ class ProgramRunner:
         multirange,
         send_gasstate_signal,
         checkbox_state,
-        queue,
+        queues_holder,
         stop_signal,
         running_signal,
         sensor_number,
@@ -41,7 +42,7 @@ class ProgramRunner:
         self.checkbox_state = checkbox_state
         self.sensor_number = sensor_number
         self.thread = None
-        self.queue = queue
+        self.queues_holder = queues_holder
         self.sensors_critical_values_bottom = sensors_critical_values_bottom
         self.sensors_critical_values_top = sensors_critical_values_top
 
@@ -116,8 +117,8 @@ class ProgramRunner:
                     except:
                         logger.error(traceback.format_exc())
                     finally:
-                        self.queue.put(
-                            (
+                        self.queues_holder.put(
+                            MSOneTickClass(
                                 us,
                                 rs,
                                 time_next_plus_t0,
@@ -145,11 +146,11 @@ class ProgramRunner:
         ms.clear_state(self.get_sensor_types_list())
         ms.close()
 
-    def convert_to_resistances(self, temperatures):
-        return [func(t) for t, func in zip(temperatures, self.convert_funcs)]
+    def convert_to_resistances(self, temperatures) -> tuple:
+        return tuple(func(t) for t, func in zip(temperatures, self.convert_funcs))
 
-    def convert_to_voltages(self, temperatures):
-        return [func(t) for t, func in zip(temperatures, self.convert_funcs_2)]
+    def convert_to_voltages(self, temperatures) -> tuple:
+        return tuple(func(t) for t, func in zip(temperatures, self.convert_funcs_2))
 
     def analyze_us(
         self,

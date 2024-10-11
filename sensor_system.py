@@ -86,7 +86,7 @@ class MS_ABC(ABC):
             recieved += self.ser.read(1)
         return recieved
 
-    def full_request(self, values: typing.Collection, request_type, sensor_types_list: typing.Sequence):
+    def full_request(self, values: typing.Collection, request_type, sensor_types_list: typing.Sequence) -> typing.Tuple[np.ndarray, np.ndarray]:
         """:returns us, rs
         us - voltage, measured on sensors,
         rs - resistance of heaters"""
@@ -285,7 +285,7 @@ class MS_Uni():
         self.ms.send_measurement_range(values[:self.sensors_number])
         self.ms.recieve_measurement_range_answer()
 
-    def full_request(self, values, request_type = MS_ABC.REQUEST_U, sensor_types_list = None):
+    def full_request(self, values, request_type = MS_ABC.REQUEST_U, sensor_types_list = None) -> typing.Tuple[np.ndarray, np.ndarray]:
         values = list(values)
         if sensor_types_list is None:
             sensor_types_list = []

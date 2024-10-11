@@ -40,14 +40,14 @@ class ProgramGenerator:
         cls.stages_counter = 0
 
     @staticmethod
-    def convert_temperatures(temperatures):
+    def convert_temperatures(temperatures) -> tuple:
         if isinstance(temperatures, list):
             if len(temperatures) == 12:
-                return temperatures
+                return tuple(temperatures)
             else:
-                temp = (min(temperatures), ) * 12
+                temp = [min(temperatures), ] * 12
                 temp[:len(temperatures)] = temperatures
-                return temp
+                return tuple(temp)
         else:
             return (temperatures, ) * 12
     @staticmethod
