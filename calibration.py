@@ -27,17 +27,17 @@ values_for_css_boxes = [MS_ABC.SEND_CSS_1_4,
                         MS_ABC.SEND_CSS_5_8, MS_ABC.SEND_CSS_9_12]
 
 
-
-
 class CalibrationWidget(QtWidgets.QWidget):
 
     got_new_data = Signal()
+
     def __init__(self, parent, log_level, global_settings):
         super().__init__()
         self.setWindowTitle("Calibration")
         self.parent_py = parent
         self.global_settings = global_settings
         self.log_level = log_level
+        self.settings: "EquipmentSettings" = self.parent_py.settings_widget
 
         self.stopped = True
         self.ms = None
@@ -49,7 +49,7 @@ class CalibrationWidget(QtWidgets.QWidget):
         left_layout = QtWidgets.QVBoxLayout()
 
         self.calibration_settings = CalibrationSettings(self)
-        self.cal_plot_widget = CalibrationPlotWidget(self)
+        self.cal_plot_widget = CalibrationPlotWidget(self, self.settings)
         self.got_new_data.connect(self.cal_plot_widget.plot_new_data)
         self.cal_buttons = CalibrationButtons(self)
 
@@ -62,8 +62,9 @@ class CalibrationWidget(QtWidgets.QWidget):
         self.save_buttons = SaveButtons(self)
         self.css_checkboxes = CssCheckBoxes(self)
 
-        self.parent_py.settings_widget.redraw_signal.connect(self.per_sensor.ui_init)
-        self.parent_py.settings_widget.start_program_signal.connect(self.cal_buttons.process_program_start)
+        self.settings.redraw_signal.connect(self.per_sensor.ui_init)
+        self.settings.redraw_signal.connect(self.cal_plot_widget.redraw_number_of_lines)
+        self.settings.start_program_signal.connect(self.cal_buttons.process_program_start)
 
         layout.addLayout(left_layout)
 
@@ -90,11 +91,11 @@ class CalibrationWidget(QtWidgets.QWidget):
 
     @property
     def comport(self) -> str:
-        return self.parent_py.settings_widget.get_variables()[0]
+        return self.settings.get_comport()
 
     @property
     def sensor_number(self) -> int:
-        return self.parent_py.settings_widget.get_variables()[1]
+        return self.settings.get_sensor_number()
 
     @Slot()
     def start_ms(self):
@@ -161,7 +162,7 @@ class CalibrationWidget(QtWidgets.QWidget):
         if self.ms:
             return
 
-        self.ms = self.parent_py.settings_widget.get_new_ms()
+        self.ms = self.settings.get_new_ms()
 
         (
             initial_voltage,
@@ -484,8 +485,9 @@ class CalibrationSettings(QtWidgets.QWidget):
 
 
 class CalibrationPlotWidget(pg.PlotWidget):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, parent, settings: "EquipmentSettings", *args, **kwargs):
+        super().__init__(parent, *args, **kwargs)
+        self.settings = settings
         self.legend = pg.LegendItem(offset=(-10, 10), labelTextColor=pg.mkColor("#FFFFFF"),
                                     brush=pg.mkBrush(pg.mkColor("#111111")))
         self.voltages = None
@@ -503,10 +505,19 @@ class CalibrationPlotWidget(pg.PlotWidget):
         self.plot_data_items = [
             self.plot([0], [0], name=f"Sensor {i + 1}") for i in range(len(colors_for_lines))
         ]
-        for idx, (plot_data_item, color) in enumerate(zip(self.plot_data_items, colors_for_lines)):
+        for plot_data_item, color in zip(self.plot_data_items, colors_for_lines):
             plot_data_item.setPen(pg.mkPen(pg.mkColor(color), width=2))
             plot_data_item.setCurveClickable(True)
-            self.legend.addItem(plot_data_item, f"Sensor {idx + 1}")
+
+        self.redraw_number_of_lines()
+
+
+    def redraw_number_of_lines(self):
+        self.legend.clear()
+        sensor_number = self.settings.get_sensor_number()
+        for idx, plot_data_item in enumerate(self.plot_data_items):
+            if idx < sensor_number:
+                self.legend.addItem(plot_data_item, f"Sensor {idx + 1}")
 
     def set_lines(self, voltages, temperatures):
         self.voltages = voltages

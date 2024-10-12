@@ -185,18 +185,19 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
                 self.choose_sensor_range(self.r4_label.text())
 
         if self.sensor_positions is not None:
-            for idx, mode in enumerate(range(1, 4)):
-                (
-                    critical_top_voltage,
-                    critical_bottom_voltage,
-                ) = self.get_critical_voltages_for_mode(mode)
-                layout3.addWidget(QtWidgets.QLabel(self.r4_str_values[idx]), idx, 0)
-                layout3.addWidget(
-                    QtWidgets.QLabel("{:1.4f}".format(critical_bottom_voltage)), idx, 1
-                )
-                layout3.addWidget(
-                    QtWidgets.QLabel("{:1.4f}".format(critical_top_voltage)), idx, 2
-                )
+            if self.multirange:
+                for idx, mode in enumerate(range(1, 4)):
+                    (
+                        critical_top_voltage,
+                        critical_bottom_voltage,
+                    ) = self.get_critical_voltages_for_mode(mode)
+                    layout3.addWidget(QtWidgets.QLabel(self.r4_str_values[idx]), idx, 0)
+                    layout3.addWidget(
+                        QtWidgets.QLabel("{:1.4f}".format(critical_bottom_voltage)), idx, 1
+                    )
+                    layout3.addWidget(
+                        QtWidgets.QLabel("{:1.4f}".format(critical_top_voltage)), idx, 2
+                    )
 
         layout.addStretch()
 
