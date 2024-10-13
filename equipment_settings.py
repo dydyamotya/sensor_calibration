@@ -2,17 +2,18 @@ import logging
 
 from PySide2 import QtCore, QtWidgets
 
-logger = logging.getLogger(__name__)
 
-from database_widgets import (
+from database.base_widgets import (
     DatabaseLeaderComboboxWidget,
-    DatabaseNonleaderComboboxWidget,
     DatabaseNonleaderTableWidget,
 )
+from database.comport_widget import ComportDatabaseWidget
+from database.multirange_widget import MultirangeDatabaseWidget
+from database.sensor_number_widget import SensorNumberDatabaseWidget
 from models import Machine, SensorPosition
-from pyside_constructor_widgets.widgets import comports_list
 from sensor_system import MS_Uni
 
+logger = logging.getLogger(__name__)
 
 class EquipmentSettings(QtWidgets.QWidget):
     redraw_signal = QtCore.Signal(int)
@@ -35,21 +36,13 @@ class EquipmentSettings(QtWidgets.QWidget):
             QtWidgets.QLabel('Hit "Enter" in "Machine name" field to change machine')
         )
 
-        self.comport_widget = DatabaseNonleaderComboboxWidget(
-            self.machine_name_widget, "last_port", comports_list(), comports_list()
-        )
+        self.comport_widget = ComportDatabaseWidget(self.machine_name_widget)
         layout.addRow("Port:", self.comport_widget)
 
-        self.sensor_number_widget = DatabaseNonleaderComboboxWidget(
-            self.machine_name_widget, "sensors_number", ["4", "12"], [4, 12]
-        )
-
+        self.sensor_number_widget = SensorNumberDatabaseWidget(self.machine_name_widget)
         layout.addRow("Sensor number:", self.sensor_number_widget)
 
-        self.multirange_widget = DatabaseNonleaderComboboxWidget(
-            self.machine_name_widget, "multirange", ["yes", "no"], [1, 0]
-        )
-
+        self.multirange_widget = MultirangeDatabaseWidget(self.machine_name_widget)
         layout.addRow("Multirange:", self.multirange_widget)
 
         self.modes_widget = DatabaseNonleaderTableWidget(
@@ -137,7 +130,7 @@ class EquipmentSettings(QtWidgets.QWidget):
     def toggle_visibility(self):
         self.setVisible(not self.isVisible())
         if self.isVisible():
-            self.comport_widget.refresh_values(comports_list(), comports_list())
+            self.comport_widget.refresh_values()
 
     def keyReleaseEvent(self, event):
         if event.key() == QtCore.Qt.Key_Escape:

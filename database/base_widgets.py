@@ -82,18 +82,6 @@ class DatabaseNonleaderComboboxWidget(QtWidgets.QComboBox):
         self.addItems(keys)
         self.activated.connect(self.on_nonleader_value_changed)
 
-    def refresh_values(self, keys: typing.Sequence, values: typing.Sequence):
-
-        current_value = self.currentText()
-        self.clear()
-        self.mapping = dict(zip(keys, values))
-        self.keys = keys
-        self.values = values
-        self.addItems(keys)
-        try:
-            self.setCurrentIndex(self.keys.index(current_value))
-        except ValueError:
-            self.setCurrentIndex(0)
 
     def on_leader_value_change(self, value: str):
         logger.debug("On leader value change")
