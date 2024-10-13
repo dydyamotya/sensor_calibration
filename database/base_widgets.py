@@ -35,12 +35,18 @@ class DatabaseLeaderComboboxWidget(QtWidgets.QComboBox):
         self.setEditable(True)
         self.fill_with_values()
 
+        self.activated.connect(self.on_activated_event)
+
     def get_current_model_values(self):
         return tuple(map(lambda x: x.__getattribute__(self.key), self.database_model.select()))
 
     def fill_with_values(self):
         self.clear()
         self.addItems(self.get_current_model_values())
+
+    def on_activated_event(self, index: int):
+        self.set_new_value(self.currentText())
+        self.enter_hit_signal.emit(self.currentText())
 
     def set_new_value(self, value: str):
         if value not in self.get_current_model_values():
@@ -67,32 +73,35 @@ class DatabaseLeaderComboboxWidget(QtWidgets.QComboBox):
         else:
             return to_return
 
+    def get_model_object(self, value: str):
+        try:
+            return self.database_model.get(getattr(self.database_model, self.key) == value)
+        except IndexError:
+            return None
+        except self.database_model.DoesNotExist:
+            return None
+
+    def get_current_model_object(self):
+        return self.get_model_object(self.currentText())
+
 
 class DatabaseNonleaderComboboxWidget(QtWidgets.QComboBox):
     def __init__(self, leader_widget: DatabaseLeaderComboboxWidget, key: str, keys: typing.Sequence,
                  values: typing.Sequence, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.leader_widget = leader_widget
-        self.database_model = leader_widget.database_model
-        self.leader_key = leader_widget.key
         self.key = key
         self.mapping = dict(zip(keys, values))
         self.keys = keys
         self.values = values
         self.addItems(keys)
-        self.activated.connect(self.on_nonleader_value_changed)
 
 
     def on_leader_value_change(self, value: str):
         logger.debug("On leader value change")
-        try:
-            first_answer = self.database_model.get(getattr(self.database_model, self.leader_key) == value)
-        except IndexError:
-            return
-        except self.database_model.DoesNotExist:
-            return
-        else:
-            possible_answer = getattr(first_answer, self.key)
+        model_object = self.leader_widget.get_model_object(value)
+        if model_object is not None:
+            possible_answer = getattr(model_object, self.key)
             reciprocal_dict = dict(zip(self.mapping.values(), self.mapping.keys()))
             logger.debug(possible_answer)
             try:
@@ -108,11 +117,13 @@ class DatabaseNonleaderComboboxWidget(QtWidgets.QComboBox):
             finally:
                 logger.debug(self.currentText())
 
-    def on_nonleader_value_changed(self, index: int):
-        first_answer = self.database_model.get(getattr(self.database_model, self.leader_key) == self.leader_widget.currentText())
-        value = self.mapping[self.keys[index]]
-        setattr(first_answer, self.key, value)
-        first_answer.save()
+    def save_to_database(self):
+        index = self.currentIndex()
+        database_model_object = self.leader_widget.get_current_model_object()
+        if database_model_object is not None:
+            value = self.mapping[self.keys[index]]
+            setattr(database_model_object, self.key, value)
+            database_model_object.save()
 
     def get_value(self):
         try:
@@ -123,17 +134,13 @@ class DatabaseNonleaderComboboxWidget(QtWidgets.QComboBox):
 
 class DatabaseNonleaderTableWidget(QtWidgets.QTableWidget):
 
-    someValueChanged = Signal(int)
     def __init__(self, leader_widget: DatabaseLeaderComboboxWidget, key: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.leader_widget = leader_widget
-        self.database_model = leader_widget.database_model
-        self.leader_key = leader_widget.key
+        self.model_object = None
         self.key = key
         self.setColumnCount(2)
         self.setRowCount(3)
-
-        self.itemChanged.connect(self.on_nonleader_value_changed)
 
     def load_data(self, data):
         self.clear()
@@ -141,7 +148,7 @@ class DatabaseNonleaderTableWidget(QtWidgets.QTableWidget):
             self.setItem(idx, 0, QTableWidgetItem(key))
             self.setItem(idx, 1, QTableWidgetItem(value))
 
-    def dump_data(self, process_func=None):
+    def dump_data(self, process_func=None) -> OrderedDict:
         data = OrderedDict()
         for idx in range(self.rowCount()):
             key_item = self.item(idx, 0)
@@ -165,34 +172,43 @@ class DatabaseNonleaderTableWidget(QtWidgets.QTableWidget):
 
     def on_leader_value_change(self, value: str):
         logger.debug("On leader value change")
-        try:
-            first_answer = self.database_model.get(getattr(self.database_model, self.leader_key) == value)
-        except IndexError:
-            return
-        except self.database_model.DoesNotExist:
-            return
-        else:
-            possible_answer = getattr(first_answer, self.key)
+        model_object = self.leader_widget.get_model_object(value)
+        if model_object is not None:
+            possible_answer = getattr(model_object, self.key)
             logger.debug(possible_answer)
             data = json.loads(possible_answer, object_pairs_hook=OrderedDict)
             self.load_data(data)
+            self.check_if_data_is_okey()
 
-    def on_nonleader_value_changed(self, item: QTableWidgetItem):
-        first_answer = self.database_model.get(getattr(self.database_model, self.leader_key) == self.leader_widget.currentText())
-        setattr(first_answer, self.key, json.dumps(self.dump_data()))
-        self.someValueChanged.emit(0)
-        first_answer.save()
+    def save_to_database(self):
+        database_model_object = self.leader_widget.get_current_model_object()
+        if database_model_object is not None:
+            setattr(database_model_object, self.key, json.dumps(self.dump_data()))
+            database_model_object.save()
+
+    def check_if_data_is_okey(self):
+        data = self.dump_data(process_func=float)
+        normal_default_data = {
+            "100 KOhm": '100000',
+            "1.1 MOhm": '1100000',
+            "11.1 MOhm": '11100000',
+        }
+        if tuple(data.keys())[0] == "":
+            self.load_data(normal_default_data)
+            self.save_to_database()
+
 
     def get_data(self):
         data = self.dump_data(process_func=float)
-        if len(data) == 0:
-            data = {
-                "100KOhm": 1e6,
-                "1.1MOhm": 1.1e7,
-                "11.1MOhm": 1.11e8
-            }
-        r4_str_values = tuple(data.keys())
-        r4_combobox_dict = ResistanseDict(zip(r4_str_values, data.values()))
-        r4_range_dict = dict(zip(r4_str_values, range(1, len(r4_str_values) + 1)))
-        return r4_str_values, r4_combobox_dict, r4_range_dict
+        if data is not None:
+            r4_str_values = tuple(data.keys())
+            r4_combobox_dict = ResistanseDict(zip(r4_str_values, data.values()))
+            r4_range_dict = dict(zip(r4_str_values, range(1, len(r4_str_values) + 1)))
+            return r4_str_values, r4_combobox_dict, r4_range_dict
+
+
+    def on_multirange_state_change(self, multirange_state: bool):
+        self.setEnabled(multirange_state)
+        if multirange_state:
+            self.check_if_data_is_okey()
 

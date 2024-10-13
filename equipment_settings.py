@@ -16,40 +16,43 @@ from sensor_system import MS_Uni
 logger = logging.getLogger(__name__)
 
 class EquipmentSettings(QtWidgets.QWidget):
-    redraw_signal = QtCore.Signal(int)
-    calibration_redraw_signal = QtCore.Signal(int)
+    redraw_signal = QtCore.Signal()
+    calibration_redraw_signal = QtCore.Signal()
     start_program_signal = QtCore.Signal(int)
 
     def __init__(self, global_settings, *args, **kwargs):
         super().__init__(*args, f=QtCore.Qt.Tool, **kwargs)
-        layout = QtWidgets.QFormLayout()
-        self.setLayout(layout)
+
+        main_layout = QtWidgets.QVBoxLayout(self)
+        form_layout = QtWidgets.QFormLayout()
+        buttons_layout = QtWidgets.QHBoxLayout()
+
+        main_layout.addLayout(form_layout)
+        main_layout.addLayout(buttons_layout)
+
         self.setWindowTitle("Settings")
         self.global_settings = global_settings
         self.running_program = False
         self.start_program_signal.connect(self.process_start_program_signal)
 
         self.machine_name_widget = DatabaseLeaderComboboxWidget(Machine, "name")
-
-        layout.addRow("Machine name:", self.machine_name_widget)
-        layout.addWidget(
-            QtWidgets.QLabel('Hit "Enter" in "Machine name" field to change machine')
-        )
+        form_layout.addRow("Machine name:", self.machine_name_widget)
 
         self.comport_widget = ComportDatabaseWidget(self.machine_name_widget)
-        layout.addRow("Port:", self.comport_widget)
+        form_layout.addRow("Port:", self.comport_widget)
 
         self.sensor_number_widget = SensorNumberDatabaseWidget(self.machine_name_widget)
-        layout.addRow("Sensor number:", self.sensor_number_widget)
+        form_layout.addRow("Sensor number:", self.sensor_number_widget)
 
         self.multirange_widget = MultirangeDatabaseWidget(self.machine_name_widget)
-        layout.addRow("Multirange:", self.multirange_widget)
+        form_layout.addRow("Multirange:", self.multirange_widget)
 
         self.modes_widget = DatabaseNonleaderTableWidget(
             self.machine_name_widget, "modes"
         )
+        self.multirange_widget.multirange_state_change.connect(self.modes_widget.on_multirange_state_change)
 
-        layout.addRow("Modes:", self.modes_widget)
+        form_layout.addRow("Modes:", self.modes_widget)
 
         self.machine_name_widget.enter_hit_signal.connect(
             self.comport_widget.on_leader_value_change
@@ -64,22 +67,13 @@ class EquipmentSettings(QtWidgets.QWidget):
             self.modes_widget.on_leader_value_change
         )
 
-        self.machine_name_widget.enter_hit_signal.connect(self.redraw_signal.emit)
-        self.multirange_widget.activated.connect(self.redraw_signal.emit)
-        self.sensor_number_widget.activated.connect(self.redraw_signal.emit)
-        self.comport_widget.activated.connect(self.redraw_signal.emit)
-        self.modes_widget.someValueChanged.connect(self.redraw_signal.emit)
-
-        self.machine_name_widget.enter_hit_signal.connect(
-            self.calibration_redraw_signal.emit
-        )
-        self.multirange_widget.activated.connect(self.calibration_redraw_signal.emit)
-        self.sensor_number_widget.activated.connect(self.calibration_redraw_signal.emit)
-        self.comport_widget.activated.connect(self.calibration_redraw_signal.emit)
-        self.modes_widget.someValueChanged.connect(self.calibration_redraw_signal.emit)
+        save_and_redraw_button = QtWidgets.QPushButton('Save and redraw')
+        save_and_redraw_button.clicked.connect(self.redraw_signal)
+        buttons_layout.addStretch()
+        buttons_layout.addWidget(save_and_redraw_button)
 
         self.redraw_signal.connect(self.save_settings)
-        self.calibration_redraw_signal.connect(self.save_settings)
+        self.redraw_signal.connect(self.calibration_redraw_signal)
 
         last_model_name = self.global_settings.value("lastmodel")
         try:
@@ -126,6 +120,10 @@ class EquipmentSettings(QtWidgets.QWidget):
         self.global_settings.setValue(
             "lastmodel", self.machine_name_widget.currentText()
         )
+        self.comport_widget.save_to_database()
+        self.sensor_number_widget.save_to_database()
+        self.multirange_widget.save_to_database()
+        self.modes_widget.save_to_database()
 
     def toggle_visibility(self):
         self.setVisible(not self.isVisible())
