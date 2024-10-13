@@ -14,7 +14,7 @@ from misc import (
     PlotCalibrationWidget,
     find_index_of_last_non_repeatative_element,
 )
-from models import SensorPosition, fn, Machine
+from database.models import SensorPosition, fn, Machine
 from sensor_system import MS_ABC
 
 if TYPE_CHECKING:

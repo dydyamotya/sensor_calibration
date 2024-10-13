@@ -5,7 +5,7 @@ import pyqtgraph as pg
 from PySide2 import QtCore, QtWidgets
 from yaml import dump
 
-from models import SensorPosition
+from database.models import SensorPosition
 
 logger = logging.getLogger(__name__)
 

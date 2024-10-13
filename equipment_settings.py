@@ -10,7 +10,7 @@ from database.base_widgets import (
 from database.comport_widget import ComportDatabaseWidget
 from database.multirange_widget import MultirangeDatabaseWidget
 from database.sensor_number_widget import SensorNumberDatabaseWidget
-from models import Machine, SensorPosition
+from database.models import Machine, SensorPosition
 from sensor_system import MS_Uni
 
 logger = logging.getLogger(__name__)

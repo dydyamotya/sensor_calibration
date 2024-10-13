@@ -4,7 +4,7 @@ import pathlib
 
 from PySide2 import QtCore, QtWidgets
 
-from models import SensorPosition
+from database.models import SensorPosition
 
 logger = logging.getLogger(__name__)
 
