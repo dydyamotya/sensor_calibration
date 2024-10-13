@@ -16,4 +16,4 @@ class SensorNumberDatabaseWidget(DatabaseNonleaderComboboxWidget):
         try:
             return self.mapping[self.currentText()]
         except KeyError:
-            return 4
+            return 12

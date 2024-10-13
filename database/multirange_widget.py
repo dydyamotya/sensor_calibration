@@ -16,4 +16,4 @@ class MultirangeDatabaseWidget(DatabaseNonleaderComboboxWidget):
         try:
             return self.mapping[self.currentText()]
         except KeyError:
-            return False
+            return True
