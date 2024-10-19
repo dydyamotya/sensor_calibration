@@ -49,8 +49,7 @@ class DatabaseLeaderComboboxWidget(QtWidgets.QComboBox):
         self.enter_hit_signal.emit(self.currentText())
 
     def set_new_value(self, value: str):
-        if value not in self.get_current_model_values():
-            self.database_model.create(**{self.key: value})
+        self.create_in_database(value)
         self.fill_with_values()
         self.setCurrentIndex(self.findText(value))
 
@@ -83,6 +82,16 @@ class DatabaseLeaderComboboxWidget(QtWidgets.QComboBox):
 
     def get_current_model_object(self):
         return self.get_model_object(self.currentText())
+
+    def check_new_name(self):
+        self.set_new_value(self.get_value())
+
+    def create_in_database(self, value):
+        if value not in self.get_current_model_values():
+            self.database_model.create(**{self.key: value})
+
+
+
 
 
 class DatabaseNonleaderComboboxWidget(QtWidgets.QComboBox):

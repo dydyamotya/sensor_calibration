@@ -68,12 +68,9 @@ class EquipmentSettings(QtWidgets.QWidget):
         )
 
         save_and_redraw_button = QtWidgets.QPushButton('Save and redraw')
-        save_and_redraw_button.clicked.connect(self.redraw_signal)
+        save_and_redraw_button.clicked.connect(self.save_settings)
         buttons_layout.addStretch()
         buttons_layout.addWidget(save_and_redraw_button)
-
-        self.redraw_signal.connect(self.save_settings)
-        self.redraw_signal.connect(self.calibration_redraw_signal)
 
         last_model_name = self.global_settings.value("lastmodel")
         try:
@@ -116,7 +113,9 @@ class EquipmentSettings(QtWidgets.QWidget):
         r4_data = self.modes_widget.get_data()
         return r4_data
 
+    @QtCore.Slot()
     def save_settings(self):
+        self.machine_name_widget.check_new_name()
         self.global_settings.setValue(
             "lastmodel", self.machine_name_widget.currentText()
         )
@@ -124,6 +123,9 @@ class EquipmentSettings(QtWidgets.QWidget):
         self.sensor_number_widget.save_to_database()
         self.multirange_widget.save_to_database()
         self.modes_widget.save_to_database()
+
+        self.redraw_signal.emit()
+        self.calibration_redraw_signal.emit()
 
     def toggle_visibility(self):
         self.setVisible(not self.isVisible())
