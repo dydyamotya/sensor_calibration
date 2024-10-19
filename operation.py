@@ -233,6 +233,15 @@ class OperationWidget(QtWidgets.QWidget):
 
     def start(self):
         if self.load_label.text() == "Loaded":
+            if self.runner is not None and not self.runner.isStopped():
+                msg_box = QtWidgets.QMessageBox()
+                msg_box.setWindowTitle("Вы уверены?")
+                msg_box.setText("Проводится эксперимент, завершить его и начать новый?")
+                msg_box.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+                msg_box.setDefaultButton(QtWidgets.QMessageBox.No)
+                ret = msg_box.exec_()
+                if ret == QtWidgets.QMessageBox.No:
+                    return
             self.refresh_state()
             self.load_program_button.setEnabled(False)
             comport, sensor_number, multirange, *_ = self.settings.get_variables()

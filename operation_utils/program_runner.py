@@ -194,3 +194,6 @@ class ProgramRunner:
                     ms.send_measurement_range(new_modes)
                     for i in range(len(sensor_states)):
                         sensor_states[i] = new_modes[i]
+
+    def isStopped(self) -> bool:
+        return self.stopped
