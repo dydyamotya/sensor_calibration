@@ -1,21 +1,18 @@
 import logging
 import pathlib
-import threading
 from typing import TYPE_CHECKING
 
-import numpy as np
-import pyqtgraph as pg
 import yaml
 from PySide2 import QtCore, QtWidgets
-from PySide2.QtCore import Qt, QTimer, Signal
-from PySide2.QtGui import QColor, QPixmap
+from PySide2.QtCore import QTimer, Signal
 from PySide2.QtWidgets import QFrame
 
-from misc import ClickableLabel, Lamp
+from misc import Lamp
 from operation_utils.program_generator import ProgramGenerator
 from operation_utils.queue_runner import QueueRunner
 from operation_utils.program_runner import ProgramRunner
 from operation_utils.queues_holder import QueuesHolder
+from operation_utils.operation_plot_widget import OperationalPlotWidget
 
 if TYPE_CHECKING:
     from equipment_settings import EquipmentSettings
@@ -24,68 +21,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-colors_for_lines = [
-    "#1f77b4",
-    "#ff7f0e",
-    "#2ca02c",
-    "#d62728",
-    "#9467bd",
-    "#8c564b",
-    "#e377c2",
-    "#7f7f7f",
-    "#bcbd22",
-    "#17becf",
-    "#DDDDDD",
-    "#00FF00",
-]
-
-
 def format_floats(floats_list):
     return (f"{x:5.5f}" for x in floats_list)
-
-
-class LinesDrawButton(QtWidgets.QPushButton):
-    def __init__(self, plot_widget, *args, **kwargs):
-        super(LinesDrawButton, self).__init__("Lines toggle", *args, **kwargs)
-        self.plot_widget = plot_widget
-        self.clicked.connect(self.toggle_expand)
-        self.tool_window = QtWidgets.QWidget(self, f=QtCore.Qt.Tool)
-        self.tool_window.setWindowTitle("Lines Toggle")
-        self.tool_window_layout = QtWidgets.QVBoxLayout(self.tool_window)
-
-        self.pixmaps = []
-        self.labels = []
-        for idx, color in enumerate(colors_for_lines):
-            layout3 = QtWidgets.QHBoxLayout()
-            pixmap = QPixmap(20, 20)
-            color = QColor(color)
-            pixmap.fill(color)
-            pixmap_label = ClickableLabel(idx, self)
-            pixmap_label.setPixmap(pixmap)
-            pixmap_label.setAlignment(Qt.AlignRight)
-            pixmap_label.clicked.connect(self.plot_widget.set_visible_invisible)
-            self.pixmaps.append(pixmap_label)
-            label = QtWidgets.QLabel(f"Sensor {idx + 1}")
-            self.labels.append(label)
-            layout3.addWidget(pixmap_label)
-            layout3.addWidget(label)
-            layout3.addStretch()
-            self.tool_window_layout.addLayout(layout3)
-        self.tool_window_layout.addStretch()
-
-    def toggle_expand(self):
-        logger.debug("toggle clicked")
-        logger.debug(f"tool window hidden: {self.tool_window.isHidden()}")
-        if self.tool_window.isHidden():
-            self.tool_window.show()
-        else:
-            self.tool_window.hide()
-
-    def set_number_of_sensors(self, number):
-        for idx, (label, pixmap) in enumerate(zip(self.labels, self.pixmaps)):
-            label.setVisible(idx < number)
-            pixmap.setVisible(idx < number)
-            pixmap.set_true()
 
 
 class OperationWidget(QtWidgets.QWidget):
@@ -164,10 +101,8 @@ class OperationWidget(QtWidgets.QWidget):
         layout1.addWidget(controls_groupbox)
 
         _, sensor_number, *_ = self.settings.get_variables()
-        self.plot_widget = AnswerPlotWidget(self)
+        self.plot_widget = OperationalPlotWidget(self)
         self.plot_widget.set_sensor_number(sensor_number)
-        self.lines_widget = LinesDrawButton(self.plot_widget, self)
-        self.lines_widget.set_number_of_sensors(sensor_number)
 
         layout1.addStretch(1)
 
@@ -186,7 +121,6 @@ class OperationWidget(QtWidgets.QWidget):
         temp_button = QtWidgets.QPushButton("All off")
         temp_button.clicked.connect(self.turn_off_all_lines)
         plot_options_groupbox_layout.addWidget(temp_button)
-        plot_options_groupbox_layout.addWidget(self.lines_widget)
 
         plot_options_groupbox_layout.addStretch()
 
@@ -213,7 +147,6 @@ class OperationWidget(QtWidgets.QWidget):
         comport, sensor_number, multirange, *_ = self.settings.get_variables()
         self.stop()
         self.plot_widget.set_sensor_number(sensor_number)
-        self.lines_widget.set_number_of_sensors(sensor_number)
         self.runner = None
         if self.generator is None:
             self.load_label.setText("Not loaded")
@@ -324,140 +257,18 @@ class OperationWidget(QtWidgets.QWidget):
 
     def turn_on_working_lines(self):
         if self.plot_widget:
-            for state, pixmap in zip(
-                self.measurement_widget.get_working_widgets(), self.lines_widget.pixmaps
-            ):
-                if state != pixmap.state:
-                    pixmap.click()
+            self.plot_widget.set_visible_lines_by_flags(self.measurement_widget.get_working_widgets())
 
     def turn_on_all_lines(self):
         if self.plot_widget:
-            for pixmap in self.lines_widget.pixmaps:
-                if not pixmap.state:
-                    pixmap.click()
+            self.plot_widget.set_all_lines_visible()
 
     def turn_off_all_lines(self):
         if self.plot_widget:
-            for pixmap in self.lines_widget.pixmaps:
-                if pixmap.state:
-                    pixmap.click()
+            self.plot_widget.set_all_lines_invisible()
 
     def on_running_signal(self):
         self.lamp.set_running()
 
 
 
-class AnswerPlotWidget(pg.PlotWidget):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.sensor_number = 12
-        self.number_of_dots = 1200
-
-        self.rs = np.empty(shape=(self.sensor_number, self.number_of_dots))
-        self.us = np.empty(shape=(self.sensor_number, self.number_of_dots))
-        self.times = np.empty(shape=(self.number_of_dots,))
-        self.drawing_index = 0
-        self.emphasized_lines = []
-        self.hidden_lines = []
-        self.legend = pg.LegendItem(
-            offset=(-10, 10),
-            labelTextColor=pg.mkColor("#FFFFFF"),
-            brush=pg.mkBrush(pg.mkColor("#111111")),
-        )
-        plot_item = self.getPlotItem()
-        self.vboxitem = plot_item.getViewBox()
-        self.legend.setParentItem(plot_item)
-        plot_item.showGrid(x=True, y=True)
-        plot_item.setLogMode(y=True)
-
-        self.plot_data_items = [
-            self.plot([0], [0], name=f"Sensor {i + 1}")
-            for i in range(self.sensor_number)
-        ]
-        for idx, (plot_data_item, color) in enumerate(
-            zip(self.plot_data_items, colors_for_lines)
-        ):
-            plot_data_item.setPen(pg.mkPen(pg.mkColor(color), width=2))
-            plot_data_item.setCurveClickable(True)
-            plot_data_item.sigClicked.connect(self.line_clicked)
-            self.legend.addItem(plot_data_item, f"Sensor {idx + 1}")
-        self.lock = threading.Lock()
-
-    def line_clicked(self, line):
-        logger.debug("Line clicked")
-        if line in self.emphasized_lines:
-            line.setShadowPen(pg.mkPen(None))
-            self.emphasized_lines.remove(line)
-        else:
-            line.setShadowPen(pg.mkPen(pg.mkColor("#666666"), width=8))
-            self.emphasized_lines.append(line)
-
-    def set_visible_invisible(self, index, state):
-        line = self.plot_data_items[index]
-        if line in self.vboxitem.addedItems:
-            if not state:
-                self.vboxitem.removeItem(line)
-        else:
-            if state:
-                self.vboxitem.addItem(line)
-
-    def set_visible(self, index):
-        line = self.plot_data_items[index]
-        if line not in self.vboxitem.addedItems:
-            self.vboxitem.addItem(line)
-
-    def set_invisible(self, index):
-        line = self.plot_data_items[index]
-        if line in self.vboxitem.addedItems:
-            self.vboxitem.removeItem(line)
-
-    def set_sensor_number(self, sensor_number):
-        self.sensor_number = sensor_number
-        self.clear_plot()
-
-    def clear_plot(self):
-        self.drawing_index = 0
-        self.rs = np.empty(shape=(self.sensor_number, self.number_of_dots))
-        self.us = np.empty(shape=(self.sensor_number, self.number_of_dots))
-        self.times = np.empty(shape=(self.number_of_dots,))
-        self.legend.clear()
-        for idx, plot_item_data in enumerate(self.plot_data_items):
-            plot_item_data.setData(x=[], y=[])
-            if idx < self.sensor_number:
-                self.set_visible(idx)
-                self.legend.addItem(plot_item_data, f"Sensor {idx + 1}")
-            else:
-                self.set_invisible(idx)
-
-    def hold_answer(self, answer):
-        with self.lock:
-            us, rs, time_next = answer
-            logger.debug(f"Start add dots {time_next}")
-
-            if self.drawing_index == self.number_of_dots:
-                self.rs[:, :-1] = self.rs[:, 1:]
-                self.us[:, :-1] = self.us[:, 1:]
-                self.times[:-1] = self.times[1:]
-                self.rs[:, self.number_of_dots - 1] = rs
-                self.us[:, self.number_of_dots - 1] = us
-                self.times[self.number_of_dots - 1] = time_next
-            else:
-                self.rs[:, self.drawing_index] = rs
-                self.us[:, self.drawing_index] = us
-                self.times[self.drawing_index] = time_next
-
-            if self.drawing_index < self.number_of_dots:
-                self.drawing_index += 1
-            logger.debug(f"End adding dots {time_next}")
-
-    def plot_answer(self):
-        logger.debug(f"Try plotting data, drawing_index = {self.drawing_index}")
-        with self.lock:
-            logger.debug(f"Plotting data, drawing_index = {self.drawing_index}")
-            for plot_item, us_line, rs_line in zip(
-                self.plot_data_items,
-                self.us[:, : self.drawing_index],
-                self.rs[:, : self.drawing_index],
-            ):
-                plot_item.setData(x=self.times[: self.drawing_index], y=us_line)
-            logger.debug(f"End plotting data, drawing_index = {self.drawing_index}")

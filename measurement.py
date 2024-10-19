@@ -184,7 +184,7 @@ class MeasurementWidget(QtWidgets.QWidget):
             widget.set_labels(u, r, sr, mode, temperature, un)
 
     def get_working_widgets(self):
-        return [widget.working_sensor.isChecked() for widget in self.widgets]
+        return [widget.isWorking() for widget in self.widgets]
 
     def send_us(self):
         if len(self.widgets) == 0:
