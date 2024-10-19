@@ -97,19 +97,17 @@ class CssCheckBoxes(QtWidgets.QGroupBox):
             checkbox.setEnabled(True)
 
 class PlotCalibrationWidget(QtWidgets.QWidget):
-    def __init__(self, parent, x, y, rs_u1, rs_u2, r4):
+    def __init__(self, parent):
         super().__init__(parent, f=QtCore.Qt.Tool)
+        layout = QtWidgets.QVBoxLayout()
+        self.setLayout(layout)
 
+
+    def plot_calibration(self, x, y, rs_u1, rs_u2, r4):
         gl_widget = pg.GraphicsLayoutWidget()
         p1 = gl_widget.addPlot()
         gl_widget.nextRow()
         p2 = gl_widget.addPlot()
-
-        layout = QtWidgets.QVBoxLayout()
-        self.setLayout(layout)
-        layout.addWidget(gl_widget)
-
-
 
         p1.setLogMode(y=True)
         p1.setLabel("bottom", "Voltage, V")
@@ -125,9 +123,29 @@ class PlotCalibrationWidget(QtWidgets.QWidget):
         p1.plot(linspace, f(linspace, rs_u1, rs_u2))
         p2.setXLink(p1)
         p2.plot(x, np.abs((y - f(np.array(x), rs_u1, rs_u2)) / y), symbol="o")
+
+        self.layout().addWidget(gl_widget)
+        self.show_and_center()
+
+
+    def plot_temperature_calibration(self, voltages, temperatures):
+        p1 = pg.PlotWidget()
+        p1.plot(voltages, temperatures)
+
+        p1.setLabel("bottom", "Voltage, V")
+        p1.setLabel("left", "Temperature, C")
+        self.setWindowTitle("Visualization of calibration")
+
+        self.layout().addWidget(p1)
+        self.show_and_center()
+
+    def show_and_center(self):
         screen = QtWidgets.QDesktopWidget().screenGeometry()
         self.move(screen.width() / 2, screen.height() / 2)
         self.show()
+
+
+
 
 class FileDialogLineEdit(QtWidgets.QLineEdit):
     def __init__(self, global_settings, name, *args, **kwargs):
