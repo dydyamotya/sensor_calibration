@@ -204,7 +204,6 @@ class DatabaseNonleaderTableWidget(QtWidgets.QTableWidget):
         }
         if tuple(data.keys())[0] == "":
             self.load_data(normal_default_data)
-            self.save_to_database()
 
 
     def get_data(self):

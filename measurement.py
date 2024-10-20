@@ -316,6 +316,13 @@ class MeasurementWidget(QtWidgets.QWidget):
 
     @QtCore.Slot()
     def working_sensors_subset_changed_callback(self):
+        max_of_minimums, min_of_maximums = self.get_working_sensors_temperature_calibration_interval()
+        if max_of_minimums is not None and min_of_maximums is not None:
+            self.info_label.setText("Калибровка по температуре от {:3.2f} до {:3.2f}".format(max_of_minimums, min_of_maximums))
+        else:
+            self.info_label.setText("Не выбран ни один сенсор как рабочий или ни один не калиброван")
+
+    def get_working_sensors_temperature_calibration_interval(self) -> Tuple[Optional[float], Optional[float]]:
         if self.widgets:
             min_temperatures = []
             max_temperatures = []
@@ -325,7 +332,10 @@ class MeasurementWidget(QtWidgets.QWidget):
                     min_temperatures.append(min_temperature)
                     max_temperatures.append(max_temperature)
             if len(min_temperatures) > 0:
-                self.info_label.setText("Калибровка по температуре от {:3.2f} до {:3.2f}".format(max(min_temperatures), min(max_temperatures)))
+                return max(min_temperatures), min(max_temperatures)
             else:
-                self.info_label.setText("Не выбран ни один сенсор как рабочий или ни один не калиброван")
+                return None, None
+        else:
+            return None, None
+
 

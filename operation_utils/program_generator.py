@@ -3,6 +3,9 @@ import itertools
 from scipy.interpolate import interp1d
 import numpy as np
 import logging
+from typing import Tuple
+
+from yaml import NodeEvent
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +30,11 @@ class ProgramGenerator:
 
     def calculate_full_time(self):
         self.reset_stage_number()
-        return ProgramGenerator._calculate_full_time(self.program.program, self.program.settings)
+        return ProgramGenerator._calculate_full_time(self.program.program)
+
+    def calculate_min_and_max_temperatures(self):
+        self.reset_stage_number()
+        return ProgramGenerator._calculate_min_and_max_temperatures(self.program.program)
 
     @classmethod
     def get_stage_number(cls):
@@ -96,20 +103,6 @@ class ProgramGenerator:
             else:
                 raise ProgramGeneratorException
 
-    @staticmethod
-    def _calculate_full_time(program, settings):
-        full_time = 0
-        for stage in program:
-            if stage.type == "simple":
-                full_time += ProgramGenerator._calculate_simple_time(stage)
-            elif stage.type == "stepwise":
-                full_time += ProgramGenerator._calculate_stepwise_time(stage)
-            elif stage.type == "cyclic":
-                full_time += ProgramGenerator._calculate_cyclic_time(stage)
-            else:
-                raise ProgramGeneratorException
-        return full_time
-
 
     @staticmethod
     def _process_simple(stage, settings):
@@ -145,6 +138,20 @@ class ProgramGenerator:
                 yield ProgramGenerator.convert_temperatures(float(func(inter_time))), gas_get_func(inter_time), stage_num, 2
 
     @staticmethod
+    def _calculate_full_time(program):
+        full_time = 0
+        for stage in program:
+            if stage.type == "simple":
+                full_time += ProgramGenerator._calculate_simple_time(stage)
+            elif stage.type == "stepwise":
+                full_time += ProgramGenerator._calculate_stepwise_time(stage)
+            elif stage.type == "cyclic":
+                full_time += ProgramGenerator._calculate_cyclic_time(stage)
+            else:
+                raise ProgramGeneratorException
+        return full_time
+
+    @staticmethod
     def _calculate_simple_time(stage):
         return stage.time
 
@@ -155,6 +162,42 @@ class ProgramGenerator:
     @staticmethod
     def _calculate_cyclic_time(stage):
         return stage.repeat * max(stage.temperatures.time)
-        
 
+    @staticmethod
+    def _calculate_min_and_max_temperatures(program) -> Tuple[float, float]:
+        min_temperatures = []
+        max_temperatures = []
+        for stage in program:
+            if stage.type == "simple":
+                min_temperatures.append(ProgramGenerator._calculate_simple_temperature(stage))
+                max_temperatures.append(ProgramGenerator._calculate_simple_temperature(stage))
+            elif stage.type == "stepwise":
+                min_temperatures.append(ProgramGenerator._calculate_stepwise_min_temperature(stage))
+                max_temperatures.append(ProgramGenerator._calculate_stepwise_max_temperature(stage))
+            elif stage.type == "cyclic":
+                min_temperatures.append(ProgramGenerator._calculate_cyclic_min_temperature(stage))
+                max_temperatures.append(ProgramGenerator._calculate_cyclic_max_temperature(stage))
+            else:
+                raise ProgramGeneratorException
+        return min(min_temperatures), max(max_temperatures)
+
+    @staticmethod
+    def _calculate_simple_temperature(stage):
+        return stage.temperature
+
+    @staticmethod
+    def _calculate_stepwise_min_temperature(stage):
+        return min(stage.temperature_start, stage.temperature_stop)
+        
+    @staticmethod
+    def _calculate_stepwise_max_temperature(stage):
+        return max(stage.temperature_start, stage.temperature_stop)
+
+    @staticmethod
+    def _calculate_cyclic_min_temperature(stage):
+        return np.min(stage.temperatures.temperature)
+        
+    @staticmethod
+    def _calculate_cyclic_max_temperature(stage):
+        return np.max(stage.temperatures.temperature)
 

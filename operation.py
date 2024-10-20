@@ -100,9 +100,8 @@ class OperationWidget(QtWidgets.QWidget):
 
         layout1.addWidget(controls_groupbox)
 
-        _, sensor_number, *_ = self.settings.get_variables()
         self.plot_widget = OperationalPlotWidget(self)
-        self.plot_widget.set_sensor_number(sensor_number)
+        self.plot_widget.set_sensor_number(self.settings.get_sensor_number())
 
         layout1.addStretch(1)
 
@@ -144,13 +143,11 @@ class OperationWidget(QtWidgets.QWidget):
         layout.addWidget(self.plot_widget)
 
     def refresh_state(self):
-        comport, sensor_number, multirange, *_ = self.settings.get_variables()
         self.stop()
-        self.plot_widget.set_sensor_number(sensor_number)
+        self.plot_widget.set_sensor_number(self.settings.get_sensor_number())
         self.runner = None
         if self.generator is None:
-            self.load_label.setText("Not loaded")
-            self.load_label.setStyleSheet("background-color:pink")
+            self.set_program_not_loaded()
         else:
             self.load_label.setText("Loaded")
             self.load_label.setStyleSheet("background-color:palegreen")
@@ -177,7 +174,6 @@ class OperationWidget(QtWidgets.QWidget):
                     return
             self.refresh_state()
             self.load_program_button.setEnabled(False)
-            comport, sensor_number, multirange, *_ = self.settings.get_variables()
 
             (
                 critical_top,
@@ -190,13 +186,13 @@ class OperationWidget(QtWidgets.QWidget):
                 self.measurement_widget.get_sensor_types_list,
                 self.measurement_widget.get_convert_funcs,
                 self.get_range_mode_settings(),
-                multirange,
+                self.settings.get_multirange(),
                 self.gasstate_widget.send_gasstate_signal,
                 self.get_checkbox_state,
                 self.queues_holder,
                 self.stop_signal,
                 self.running_signal,
-                sensor_number,
+                self.settings.get_sensor_number(),
                 critical_top,
                 critical_bottom,
             )
@@ -223,15 +219,14 @@ class OperationWidget(QtWidgets.QWidget):
         self.load_program_button.setEnabled(True)
 
     def load_program(self):
-        filename, filter = QtWidgets.QFileDialog.getOpenFileName(
+        filename, _ = QtWidgets.QFileDialog.getOpenFileName(
             self,
             "Open program",
             self.global_settings.value("operation_widget_programs_path", "./tests"),
             "Program file (*.yaml)",
         )
         if not filename:
-            self.load_label.setText("Not loaded")
-            self.load_label.setStyleSheet("background-color:pink")
+            self.set_program_not_loaded()
             return
         (
             self.global_settings.setValue(
@@ -242,13 +237,27 @@ class OperationWidget(QtWidgets.QWidget):
         try:
             loaded = yaml.load(pathlib.Path(filename).read_text(), yaml.Loader)
         except:
-            self.load_label.setText("Not loaded")
-            self.load_label.setStyleSheet("background-color:pink")
+            self.set_program_not_loaded()
             raise
         else:
             self.generator = ProgramGenerator(loaded)
-            self.load_label.setText("Loaded")
-            self.load_label.setStyleSheet("background-color:palegreen")
+            program_min_temperature, program_max_temperature = self.generator.calculate_min_and_max_temperatures()
+            max_of_minimums, min_of_maximums = self.measurement_widget.get_working_sensors_temperature_calibration_interval()
+            if max_of_minimums is not None and min_of_maximums is not None:
+                if max_of_minimums <= program_min_temperature and min_of_maximums >= program_max_temperature:
+                    self.load_label.setText("Loaded")
+                    self.load_label.setStyleSheet("background-color:palegreen")
+                else:
+                    self.parent_py.message_signal.emit("Chosen program is not compatible with chosen working sensors calibration.")
+                    self.set_program_not_loaded()
+            else:
+                self.parent_py.message_signal.emit("No working calibrated sensors.")
+                self.set_program_not_loaded()
+
+    def set_program_not_loaded(self):
+        self.load_label.setText("Not loaded")
+        self.load_label.setStyleSheet("background-color:pink")
+
 
     def set_values_on_meas_widget(self):
         results = self.queue_runner.get_meas_tuple()

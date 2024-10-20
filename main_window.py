@@ -13,6 +13,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 class MyMainWindow(QtWidgets.QMainWindow):
+    message_signal = QtCore.Signal(str)
     def __init__(self, settings: QtCore.QSettings, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -25,7 +26,17 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self.plotter_experiment_widget = ExperimentPlotter()
         self.converter_widget = ConverterWidget(settings)
         self.experiment_editor_widget = ExperimentEditorWidget(settings, self)
+        self.message_signal.connect(self.on_message_callback)
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:
         self.gasstate_widget.save_to_settings()
         return super().closeEvent(event)
+    
+    @QtCore.Slot(str)
+    def on_message_callback(self, message: str):
+        msg_box = QtWidgets.QMessageBox()
+        msg_box.setWindowTitle("Message")
+        msg_box.setText(message)
+        return msg_box.exec_()
+
+

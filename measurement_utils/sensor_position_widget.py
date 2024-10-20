@@ -410,9 +410,9 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
         sensor_position: SensorPosition = (
             self.get_current_sensor_position_from_database()
         )
-        x = tuple(map(float, sensor_position.x[1:-1].split(",")))
-        y = tuple(map(float, sensor_position.y[1:-1].split(",")))
         try:
+            x = tuple(map(float, sensor_position.x[1:-1].split(",")))
+            y = tuple(map(float, sensor_position.y[1:-1].split(",")))
             PlotCalibrationWidget(
                 self).plot_calibration(
                 x,
@@ -475,44 +475,51 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
                 critical_top_voltage = 5.0
             else:
                 r4_str = self.r4_str_values[next_mode - 1]
-                sensor_position, *_ = [
+                suitable_sensor_positions = [
                     sensor_position
                     for sensor_position in self.sensor_positions
                     if sensor_position is not None and (sensor_position.r4 == r4_str)
                 ]
+                if len(suitable_sensor_positions) > 0:
+                    sensor_position = suitable_sensor_positions[0]
 
-                rs_u1_2 = float(sensor_position.rs_u1)
-                rs_u2_2 = float(sensor_position.rs_u2)
-                r4_2 = self.r4_to_float[sensor_position.r4]
+                    rs_u1_2 = float(sensor_position.rs_u1)
+                    rs_u2_2 = float(sensor_position.rs_u2)
+                    r4_2 = self.r4_to_float[sensor_position.r4]
 
-                critical_top_voltage = (
-                    self.calculate_critical_value(
-                        rs_u1_1, rs_u1_2, rs_u2_1, rs_u2_2, r4_1, r4_2
+                    critical_top_voltage = (
+                        self.calculate_critical_value(
+                            rs_u1_1, rs_u1_2, rs_u2_1, rs_u2_2, r4_1, r4_2
+                        )
+                        + 0.1
                     )
-                    + 0.1
-                )
+                else:
+                    critical_top_voltage = 5.0
 
             if prev_mode < 1:
                 critical_bottom_voltage = 0.0
             else:
                 r4_str = self.r4_str_values[prev_mode - 1]
-                sensor_position, *_ = [
+                suitable_sensor_positions = [
                     sensor_position
                     for sensor_position in self.sensor_positions
                     if sensor_position is not None and (sensor_position.r4 == r4_str)
                 ]
+                if len(suitable_sensor_positions) > 0:
 
-                rs_u1_2 = float(sensor_position.rs_u1)
-                rs_u2_2 = float(sensor_position.rs_u2)
-                r4_2 = self.r4_to_float[sensor_position.r4]
+                    rs_u1_2 = float(sensor_position.rs_u1)
+                    rs_u2_2 = float(sensor_position.rs_u2)
+                    r4_2 = self.r4_to_float[sensor_position.r4]
 
-                critical_bottom_voltage = (
-                    5.0
-                    - self.calculate_critical_value(
-                        rs_u1_2, rs_u1_1, rs_u2_2, rs_u2_1, r4_2, r4_1
+                    critical_bottom_voltage = (
+                        5.0
+                        - self.calculate_critical_value(
+                            rs_u1_2, rs_u1_1, rs_u2_2, rs_u2_1, r4_2, r4_1
+                        )
+                        - 0.1
                     )
-                    - 0.1
-                )
+                else:
+                    critical_bottom_voltage = 0.0
 
             return critical_top_voltage, critical_bottom_voltage
         return 5.0, 0.0
@@ -531,5 +538,6 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
             PlotCalibrationWidget(self).plot_temperature_calibration(self.voltages, self.temperatures)
         else:
             msg_box = QtWidgets.QMessageBox()
+            msg_box.setWindowTitle("Информация")
             msg_box.setText("Надо сначала загрузить калибровку. Ну либо для этого сенсора калибровка отсутствует.")
             return msg_box.exec_()
