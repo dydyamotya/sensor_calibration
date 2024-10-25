@@ -113,7 +113,7 @@ class ProgramRunner:
                     raise
                 else:
                     try:
-                        self.send_gasstate_signal.emit(gas_state)
+                        self.send_gasstate_signal.emit(int(gas_state))
                     except:
                         logger.error(traceback.format_exc())
                     finally:
