@@ -92,6 +92,7 @@ class QueueRunner(QtCore.QObject):
                 )
             )
         logger.debug(f"Call in cycle")
+        logger.debug(f"{one_tick_data}")
         self.set_meas_tuple(
             (one_tick_data.us,
              one_tick_data.rs,
