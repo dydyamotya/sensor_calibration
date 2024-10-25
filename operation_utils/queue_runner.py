@@ -17,12 +17,13 @@ class QueueRunner(QtCore.QObject):
 
     def __init__(
         self,
+        parent,
         queue: Queue,
         converters_func_voltage_to_r,
         multirange_state_func,
         save_folder,
     ):
-        super().__init__()
+        super().__init__(parent)
         self.queue = queue
         self.thread = None
         self.stopped = True

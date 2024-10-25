@@ -49,6 +49,7 @@ class OperationWidget(QtWidgets.QWidget):
             "operation_widget_save_path", "./tests"
         )
         self.queue_runner = QueueRunner(
+            self,
             self.queues_holder.add_new_queue(),
             self.measurement_widget.get_voltage_to_resistance_funcs,
             self.measurement_widget.get_multirange_status,
