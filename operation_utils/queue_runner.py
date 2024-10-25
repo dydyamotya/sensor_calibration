@@ -1,5 +1,4 @@
 from queue import Queue
-from program_dataclasses.operation_classes import MSOneTickClass
 import threading
 import pathlib
 import datetime
@@ -11,8 +10,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class QueueRunner(QtCore.QObject):
 
+class QueueRunner(QtCore.QObject):
     hold_result = QtCore.Signal(tuple)
 
     def __init__(
@@ -21,6 +20,7 @@ class QueueRunner(QtCore.QObject):
         queue: Queue,
         converters_func_voltage_to_r,
         multirange_state_func,
+        converters_func_heater_res_to_heater_temperature,
         save_folder,
     ):
         super().__init__(parent)
@@ -30,6 +30,9 @@ class QueueRunner(QtCore.QObject):
         self.filename = None
         self.save_folder = save_folder
         self.converter_funcs_dicts = converters_func_voltage_to_r
+        self.converter_funcs_heater_res_to_heater_temp = (
+            converters_func_heater_res_to_heater_temperature
+        )
         self.multirange_state_func = multirange_state_func
         self._meas_values_tuple = None
         self.meas_tuple_lock = threading.Lock()
@@ -65,17 +68,36 @@ class QueueRunner(QtCore.QObject):
     def cycle(self):
         fd_bin = self.binary_filename.open("wb")
         converter_funcs = self.converter_funcs_dicts()
+        converter_funcs_heater_res_to_heater_temp = (
+            self.converter_funcs_heater_res_to_heater_temp()
+        )
         multirange = self.multirange_state_func()
         while not self.stopped:
             sleep(0.02)
             if not self.queue.empty():
-                self.one_cycle_step(multirange, converter_funcs, fd_bin)
+                self.one_cycle_step(
+                    multirange,
+                    converter_funcs,
+                    converter_funcs_heater_res_to_heater_temp,
+                    fd_bin,
+                )
         while not self.queue.empty():
-            self.one_cycle_step(multirange, converter_funcs, fd_bin)
+            self.one_cycle_step(
+                multirange,
+                converter_funcs,
+                converter_funcs_heater_res_to_heater_temp,
+                fd_bin,
+            )
 
         fd_bin.close()
 
-    def one_cycle_step(self, multirange: bool, converter_funcs, fd_bin):
+    def one_cycle_step(
+        self,
+        multirange: bool,
+        converter_funcs,
+        converter_funcs_heater_res_to_heater_temp,
+        fd_bin,
+    ):
         one_tick_data = self.queue.get()
         if multirange:
             sensor_resistances = tuple(
@@ -87,21 +109,31 @@ class QueueRunner(QtCore.QObject):
         else:
             sensor_resistances = tuple(
                 converter_func_dict(u)
-                for converter_func_dict, u, sensor_state in zip(
-                    converter_funcs, one_tick_data.us, one_tick_data.sensor_states
+                for converter_func_dict, u in zip(
+                    converter_funcs, one_tick_data.us
                 )
             )
+        heater_temperatures = tuple(
+            convert_heater_res_to_heater_temp(heater_res)
+            for convert_heater_res_to_heater_temp, heater_res in zip(
+                converter_funcs_heater_res_to_heater_temp, one_tick_data.rs
+            )
+        )
         logger.debug(f"Call in cycle")
         logger.debug(f"{one_tick_data}")
         self.set_meas_tuple(
-            (one_tick_data.us,
-             one_tick_data.rs,
-             sensor_resistances,
-             one_tick_data.sensor_states,
-             one_tick_data.temperatures,
-             one_tick_data.converted)
+            (
+                one_tick_data.us,
+                one_tick_data.rs,
+                sensor_resistances,
+                one_tick_data.sensor_states,
+                one_tick_data.temperatures,
+                one_tick_data.converted,
+            )
         )
-        self.hold_result.emit((sensor_resistances, one_tick_data.rs, one_tick_data.time_next))
+        self.hold_result.emit(
+            (sensor_resistances, heater_temperatures, one_tick_data.time_next)
+        )
         if self.bin_write_struct is None:
             sensors_number = len(one_tick_data.rs)
             self.bin_write_struct = struct.Struct(

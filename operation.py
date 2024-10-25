@@ -53,6 +53,7 @@ class OperationWidget(QtWidgets.QWidget):
             self.queues_holder.add_new_queue(),
             self.measurement_widget.get_voltage_to_resistance_funcs,
             self.measurement_widget.get_multirange_status,
+            self.measurement_widget.get_heater_resistance_to_heater_temperature_funcs,
             save_folder,
         )
         self.settings: EquipmentSettings = self.parent_py.settings_widget

@@ -172,6 +172,11 @@ class MeasurementWidget(QtWidgets.QWidget):
             widget.get_voltage_to_resistance_funcs() for widget in self.widgets
         )
 
+    def get_heater_resistance_to_heater_temperature_funcs(self):
+        return tuple(
+            widget.get_temperature_for_resistance_func() for widget in self.widgets
+        )
+
     def get_multirange_status(self) -> int:
         return self.multirange_state
 

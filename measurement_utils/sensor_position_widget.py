@@ -272,12 +272,21 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
                 logger.debug(
                     f"Calibration T_to_R loading failed for {self.sensor_num} {self.machine_name} sensor"
                 )
+                logger.debug(
+                    f"Calibration R_to_T loading failed for {self.sensor_num} {self.machine_name} sensor"
+                )
                 self.func_T_to_R = lambda x: 0
+                self.func_R_to_T = lambda x: 0
             else:
                 self.func_T_to_R = lambda x: res.intercept + res.slope * x
+                self.func_R_to_T = lambda y: (y - res.intercept) / res.slope 
                 logger.debug(
                     f"Calibration T_to_R successful for {self.sensor_num} {self.machine_name} sensor"
                 )
+                logger.debug(
+                    f"Calibration R_to_T successful for {self.sensor_num} {self.machine_name} sensor"
+                )
+
 
             self.temperatures_loaded = True
         self.change_color()
@@ -296,6 +305,11 @@ class SensorPositionWidget(QtWidgets.QGroupBox):
         if not (self.temperatures_loaded and self.working_sensor.isChecked()):
             return lambda x: 0
         return self.func_T_to_R
+
+    def get_temperature_for_resistance_func(self):
+        if not (self.temperatures_loaded and self.working_sensor.isChecked()):
+            return lambda x: 0
+        return self.func_R_to_T
 
     def get_voltage_for_temperature_func(self):
         if not (self.temperatures_loaded and self.working_sensor.isChecked()):
