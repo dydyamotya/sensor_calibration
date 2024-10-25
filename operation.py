@@ -138,7 +138,7 @@ class OperationWidget(QtWidgets.QWidget):
         layout2.addStretch(1)
 
         self.timer_plot.timeout.connect(self.plot_widget.plot_answer)
-        self.queue_runner.set_hold(self.plot_widget.hold_answer)
+        self.queue_runner.hold_result.connect((self.plot_widget.hold_answer))
         self.values_set_timer.timeout.connect(self.set_values_on_meas_widget)
         layout.addWidget(self.plot_widget)
 

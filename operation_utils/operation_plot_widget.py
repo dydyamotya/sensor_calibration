@@ -1,4 +1,5 @@
 import pyqtgraph as pg
+from PySide2 import QtCore
 import numpy as np
 from misc import colors_for_lines
 import threading
@@ -44,7 +45,7 @@ class OperationalPlotWidget(pg.GraphicsLayoutWidget):
         self.sensor_resistances_one_view.clear()
         self.heater_resistances_one_view.clear()
 
-
+    @QtCore.Slot(tuple)
     def hold_answer(self, answer):
         with self.lock:
             sensor_resistances, heater_resistances, time_next = answer

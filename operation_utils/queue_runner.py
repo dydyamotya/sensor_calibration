@@ -5,12 +5,16 @@ import pathlib
 import datetime
 from time import sleep
 import struct
+from PySide2 import QtCore
 
 import logging
 
 logger = logging.getLogger(__name__)
 
-class QueueRunner:
+class QueueRunner(QtCore.QObject):
+
+    hold_result = QtCore.Signal(tuple)
+
     def __init__(
         self,
         queue: Queue,
@@ -18,9 +22,9 @@ class QueueRunner:
         multirange_state_func,
         save_folder,
     ):
+        super().__init__()
         self.queue = queue
         self.thread = None
-        self.hold_method = None
         self.stopped = True
         self.filename = None
         self.save_folder = save_folder
@@ -29,12 +33,6 @@ class QueueRunner:
         self._meas_values_tuple = None
         self.meas_tuple_lock = threading.Lock()
         self.bin_write_struct = None
-
-    def set_hold(self, hold_method):
-        self.hold_method = hold_method
-
-    def drop_hold_method(self):
-        self.hold_method = None
 
     def get_meas_tuple(self):
         with self.meas_tuple_lock:
@@ -45,7 +43,7 @@ class QueueRunner:
             self._meas_values_tuple = values
 
     def start(self):
-        if self.hold_method is not None and self.stopped:
+        if self.stopped:
             self.stopped = False
             self.thread = threading.Thread(target=self.cycle)
             self.filename = (
@@ -101,7 +99,7 @@ class QueueRunner:
              one_tick_data.temperatures,
              one_tick_data.converted)
         )
-        self.hold_method((sensor_resistances, one_tick_data.rs, one_tick_data.time_next))
+        self.hold_result.emit((sensor_resistances, one_tick_data.rs, one_tick_data.time_next))
         if self.bin_write_struct is None:
             sensors_number = len(one_tick_data.rs)
             self.bin_write_struct = struct.Struct(
