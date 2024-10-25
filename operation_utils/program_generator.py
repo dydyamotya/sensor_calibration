@@ -135,7 +135,7 @@ class ProgramGenerator:
             gas_get_func = ProgramGenerator.process_gas_state(gas_state, max_time, variable, variable_value)
             stage_num = ProgramGenerator.get_stage_number()
             for inter_time in np.arange(0, max_time, step):
-                yield ProgramGenerator.convert_temperatures(float(func(inter_time))), gas_get_func(inter_time), stage_num, 2
+                yield ProgramGenerator.convert_temperatures(float(func(inter_time))), int(gas_get_func(inter_time)), stage_num, 2
 
     @staticmethod
     def _calculate_full_time(program):

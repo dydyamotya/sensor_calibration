@@ -8,5 +8,5 @@ icons/Thumbs*
 output/
 start.bat
 install_packages.bat
-tests*
+manual_tests/
 sensoringas.db
