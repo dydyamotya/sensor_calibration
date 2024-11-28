@@ -7,6 +7,7 @@ import numpy as np
 from PySide2 import QtGui, QtWidgets, QtCore
 from superqt import QRangeSlider
 from scipy.optimize import curve_fit
+from u_calibration.plot_widget import PlotWidget
 
 if typing.TYPE_CHECKING:
     from equipment_settings import EquipmentSettings
