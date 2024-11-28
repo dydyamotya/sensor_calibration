@@ -16,6 +16,12 @@ logger = logging.getLogger(__name__)
 rs = np.array([2e10, 1e10, 2.1e9, 5e8, 1e8, 1e7, 1e6, 1e5, 5.1e4, 1e4, 1e3])
 r_labels_str = tuple(map("{:1.2e}".format, rs))
 
+def get_float(x):
+    try:
+        return float(x)
+    except:
+        return 0
+
 
 class OneSensorFrame(QtWidgets.QWidget):
     def __init__(
