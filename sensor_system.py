@@ -31,7 +31,7 @@ class MS_ABC(ABC):
         pass
 
     @abstractmethod
-    def __init__(self, port=None):
+    def __init__(self, port=None, heater_resistance_converter=100):
         self.ser = serial.Serial(port,
                                  baudrate=115200,
                                  bytesize=serial.EIGHTBITS,
@@ -41,6 +41,8 @@ class MS_ABC(ABC):
 
         self.sensors_number = None  # Must be implemented by child
         self.struct = None  # Must be implemented by child
+        self.heater_resistance_converter = heater_resistance_converter
+        self.reciprocal_heater_resistance_converter = 1 / self.heater_resistance_converter
 
     def set_port(self, port: str):
         self.ser.port = port
@@ -69,16 +71,13 @@ class MS_ABC(ABC):
     def _back_convert_u(value: int) -> float:
         return value / (2 ** 24) * 5
 
-    @staticmethod
-    def _convert_r(value: float) -> bytes:
-        reciprocal_step = 100  # step is 0.01 Ohm
+    def _convert_r(self, value: float) -> bytes:
         if value < 0:
             raise Exception("R must be larger than 0")
-        return int(value * reciprocal_step).to_bytes(2, "little", signed=False)
+        return int(value * self.heater_resistance_converter).to_bytes(2, "little", signed=False)
 
-    @staticmethod
-    def _back_convert_r(value: int) -> float:
-        return value * 0.01
+    def _back_convert_r(self, value: int) -> float:
+        return value * self.reciprocal_heater_resistance_converter
 
     def _request_test(self):
         recieved = b""
@@ -181,8 +180,8 @@ class MS_ABC(ABC):
 class MS12(MS_ABC):
     """Класс реализует протокол общения с 12-сенсорным прибором."""
 
-    def __init__(self, port=None):
-        super().__init__(port=port)
+    def __init__(self, port=None, heater_resistance_converter=100):
+        super().__init__(port=port, heater_resistance_converter=heater_resistance_converter)
         self.sensors_number = 12
         self.struct = struct.Struct(">" + (self.sensors_number + 1) * "f")
 
@@ -212,8 +211,8 @@ class MS12(MS_ABC):
 
 
 class MS4(MS_ABC):
-    def __init__(self, port=None):
-        super().__init__(port=port)
+    def __init__(self, port=None, heater_resistance_converter=100):
+        super().__init__(port=port, heater_resistance_converter=heater_resistance_converter)
         self.sensors_number = 4
         self.struct = struct.Struct(">fffff")
 
@@ -245,8 +244,8 @@ class MS4(MS_ABC):
 class MSEmulator(MS_ABC):
     """In fact, I only need to realize the full_request method and send_measurement_range"""
 
-    def __init__(self, port=None, sensor_number=4):
-        super().__init__(port=port)
+    def __init__(self, port=None, sensor_number=4, heater_resistance_converter=100):
+        super().__init__(port=port, heater_resistance_converter=heater_resistance_converter)
         self.sensors_number = sensor_number
         self.struct = struct.Struct(">f" + self.sensors_number * "f")
 
@@ -272,12 +271,12 @@ class MSEmulator(MS_ABC):
         pass
 
 class MS_Uni():
-    def __init__(self, sensor_number, port):
+    def __init__(self, sensor_number, port, heater_resistance_converter):
         self.sensors_number = sensor_number
         if sensor_number == 4:
-            self.ms = MS4(port)
+            self.ms = MS4(port, heater_resistance_converter=heater_resistance_converter)
         elif sensor_number == 12:
-            self.ms = MS12(port)
+            self.ms = MS12(port, heater_resistance_converter=heater_resistance_converter)
         else:
             raise Exception("Wrong port number")
 

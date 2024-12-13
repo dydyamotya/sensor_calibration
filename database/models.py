@@ -1,10 +1,14 @@
 from peewee import Model, IntegerField, TextField, BooleanField, SqliteDatabase
 from peewee import fn, FloatField, DateTimeField, ForeignKeyField
 from datetime import datetime
+from database.migrations import migration_add_column_to_table
 
 db = SqliteDatabase("sensoringas.db", pragmas={'foreign_keys': 1})
 
 fn = fn
+
+db.connect()
+migration_add_column_to_table(db)
 
 
 class BaseModel(Model):
@@ -20,6 +24,7 @@ class Machine(BaseModel):
     sensors_number = IntegerField(default=12)
     multirange = BooleanField(default=True)
     modes = TextField(default='{"100KOhm":"100000","1.1MOhm":"1100000","11.1MOhm":"11100000"}')
+    heater_resistance_converter = IntegerField(default=100)
 
 
 class SensorPosition(BaseModel):
@@ -34,5 +39,4 @@ class SensorPosition(BaseModel):
     machine = ForeignKeyField(Machine, backref="sensors")
 
 
-db.connect()
 db.create_tables((Machine, SensorPosition))

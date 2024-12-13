@@ -1,13 +1,6 @@
 from PySide2 import QtWidgets, QtCore
 import argparse
 import logging
-
-from choosebestcomb import ChooseBestCombinationOfSensorsWidget
-from main_window import MyMainWindow
-from u_calibration.u_calibration_widget import UCalibrationWidget
-from calibration import CalibrationWidget
-from measurement import MeasurementWidget
-from operation import OperationWidget
 import sys
 
 logger = logging.getLogger(__name__)
@@ -25,6 +18,13 @@ def main():
     logging.basicConfig(
         level=level, format="%(asctime)s:%(module)s:%(levelname)s:%(message)s"
     )
+
+    from choosebestcomb import ChooseBestCombinationOfSensorsWidget
+    from main_window import MyMainWindow
+    from u_calibration.u_calibration_widget import UCalibrationWidget
+    from calibration import CalibrationWidget
+    from measurement import MeasurementWidget
+    from operation import OperationWidget
 
     main_window = MyMainWindow(settings)
     main_window.setWindowTitle("SensorinGas Beta")

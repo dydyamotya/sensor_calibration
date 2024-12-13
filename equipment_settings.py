@@ -10,6 +10,7 @@ from database.base_widgets import (
 from database.comport_widget import ComportDatabaseWidget
 from database.multirange_widget import MultirangeDatabaseWidget
 from database.sensor_number_widget import SensorNumberDatabaseWidget
+from database.heater_resistance_converter_widget import HeaterResistanceConverterWidget
 from database.models import Machine, SensorPosition
 from sensor_system import MS_Uni
 
@@ -51,8 +52,13 @@ class EquipmentSettings(QtWidgets.QWidget):
             self.machine_name_widget, "modes"
         )
         self.multirange_widget.multirange_state_change.connect(self.modes_widget.on_multirange_state_change)
-
         form_layout.addRow("Modes:", self.modes_widget)
+
+        self.heater_resistance_converter_widget = HeaterResistanceConverterWidget(
+            self.machine_name_widget
+        )
+        form_layout.addRow("Heater resistance converter value", self.heater_resistance_converter_widget)
+
 
         self.machine_name_widget.enter_hit_signal.connect(
             self.comport_widget.on_leader_value_change
@@ -65,6 +71,9 @@ class EquipmentSettings(QtWidgets.QWidget):
         )
         self.machine_name_widget.enter_hit_signal.connect(
             self.modes_widget.on_leader_value_change
+        )
+        self.machine_name_widget.enter_hit_signal.connect(
+            self.heater_resistance_converter_widget.on_leader_value_change
         )
 
         save_and_redraw_button = QtWidgets.QPushButton('Save and redraw')
@@ -102,9 +111,10 @@ class EquipmentSettings(QtWidgets.QWidget):
     def get_new_ms(self):
         if not self.running_program:
             number_of_sensors = self.sensor_number_widget.get_value()
-            serial_port = self.comport_widget.get_value() 
-            logger.debug(f"New MS device created on port {serial_port} with {number_of_sensors} sensors")
-            return MS_Uni(number_of_sensors, serial_port)
+            serial_port = self.comport_widget.get_value()
+            heater_resistance_converter = self.heater_resistance_converter_widget.get_value()
+            logger.debug(f"New MS device created on port {serial_port} with {number_of_sensors} sensors and converter value: {heater_resistance_converter}")
+            return MS_Uni(number_of_sensors, serial_port, heater_resistance_converter)
         else:
             logger.debug("No device created because program is running")
             return None
