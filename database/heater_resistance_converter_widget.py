@@ -8,8 +8,8 @@ class HeaterResistanceConverterWidget(DatabaseNonleaderComboboxWidget):
                  *args, **kwargs):
         super().__init__(leader_widget,
                          "heater_resistance_converter",
-                         ["100", "1000"],
-                         [100, 1000],
+                         ["10", "100", "1000"],
+                         [10, 100, 1000],
                          *args,
                          **kwargs)
 
