@@ -133,6 +133,7 @@ class EquipmentSettings(QtWidgets.QWidget):
         self.sensor_number_widget.save_to_database()
         self.multirange_widget.save_to_database()
         self.modes_widget.save_to_database()
+        self.heater_resistance_converter_widget.save_to_database()
 
         self.redraw_signal.emit()
         self.calibration_redraw_signal.emit()
