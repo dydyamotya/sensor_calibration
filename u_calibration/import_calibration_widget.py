@@ -102,30 +102,48 @@ class ImportCalibrationWidget(QtWidgets.QWidget):
         config.optionxform = deduplicate
         config.read(filename)
 
-        _, sensor_number, _, _, machine_id = self.settings_widget.get_variables(
+        _, sensor_number, multirange, _, machine_id = self.settings_widget.get_variables(
         )
         not_added = []
         for sens_num in range(sensor_number):
-            for idx_r4, r4 in enumerate(self.r4_str_values):
+            if multirange:
+                for idx_r4, r4 in enumerate(self.r4_str_values):
+                    try:
+                        rs_u1 = config["Device parameters"][
+                            f"Rs_U1_{sens_num+1}_{idx_r4+1}"].replace(",", ".")
+                        rs_u2 = config["Device parameters"][
+                            f"Rs_U2_{sens_num+1}_{idx_r4+1}"].replace(",", ".")
+                    except KeyError:
+                        not_added.append((sens_num, r4))
+                    else:
+                        SensorPosition.create(machine=machine_id,
+                                            sensor_num=sens_num + 1,
+                                            r4=r4,
+                                            rs_u1=float(rs_u1),
+                                            rs_u2=float(rs_u2),
+                                            k=4.068,
+                                            x=[],
+                                            y=[])
+            else:
                 try:
-                    rs_u1 = config["Device parameters"][
-                        f"Rs_U1_{sens_num+1}_{idx_r4+1}"].replace(",", ".")
-                    rs_u2 = config["Device parameters"][
-                        f"Rs_U2_{sens_num+1}_{idx_r4+1}"].replace(",", ".")
+                    rs_u1 = config["Device parameters"][f"Rs_U1_{sens_num+1}"].replace(",", ".")
+                    rs_u2 = config["Device parameters"][f"Rs_U2_{sens_num+1}"].replace(",", ".")
+                    r4 = config["Device parameters"][f"R2_{sens_num+1}"].replace(",", ".")
                 except KeyError:
-                    not_added.append((sens_num, r4))
+                    not_added.append((sens_num))
                 else:
                     SensorPosition.create(machine=machine_id,
-                                          sensor_num=sens_num + 1,
-                                          r4=r4,
-                                          rs_u1=float(rs_u1),
-                                          rs_u2=float(rs_u2),
-                                          k=4.068,
-                                          x=[],
-                                          y=[])
+                                        sensor_num=sens_num + 1,
+                                        r4=r4,
+                                        rs_u1=float(rs_u1),
+                                        rs_u2=float(rs_u2),
+                                        k=4.068,
+                                        x=[],
+                                        y=[])
+
         message_box = QtWidgets.QMessageBox()
         if len(not_added) > 0:
-            text = "\n".join(f"{sens_num} {r4}" for sens_num, r4 in not_added)
+            text = "Not added:\n" + "\n".join(f"{sens_num} {r4}" for sens_num, r4 in not_added)
         else:
             text = "Everything imported"
         message_box.setText(text)
