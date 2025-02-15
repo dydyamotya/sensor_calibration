@@ -1,6 +1,8 @@
 from peewee import Model, IntegerField, TextField, BooleanField, SqliteDatabase
 from peewee import fn, FloatField, DateTimeField, ForeignKeyField
 from datetime import datetime
+
+import peewee
 from database.migrations import migration_add_column_to_table
 
 db = SqliteDatabase("sensoringas.db", pragmas={'foreign_keys': 1})
@@ -8,7 +10,10 @@ db = SqliteDatabase("sensoringas.db", pragmas={'foreign_keys': 1})
 fn = fn
 
 db.connect()
-migration_add_column_to_table(db)
+try:
+    migration_add_column_to_table(db)
+except peewee.OperationalError:
+    pass
 
 
 class BaseModel(Model):
